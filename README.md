@@ -97,7 +97,7 @@ That is why xT has no default, and why the result carries `is_choked` instead of
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
 - Material screening is on temperature alone. It excludes grades, it does not select one.
 - The Joule-Thomson figure is an order of magnitude estimate, not a design number.
-- No command line tool and no user interface yet. It is a library.
+- No graphical or web interface yet. There is a library and a command line tool.
 
 ---
 
@@ -127,6 +127,39 @@ All three are tests.
 
 ---
 
+## Command line
+
+Installed as `flowcoeff`, or run with `python -m flowcoefficient.cli`. No dependencies, argparse is standard library.
+
+```bash
+flowcoeff liquid --duty 250 --t-in 10 --t-out 20 --fluid water                  --p1 4 --dp 1.5 --basis gauge --style globe                  --pipe 52.5 --rated-kv 63
+```
+```
+--------------------------------------------------------------
+  Kv      17.57        Cv      20.31
+--------------------------------------------------------------
+  pressure basis             gauge
+  inlet                      5.013 bar absolute
+  outlet                     3.513 bar absolute
+  flow                       21.52 m3/h (from thermal duty 250.0 kW over 10 C)
+  vapour pressure            0.01201 bar
+  FL                         0.9 (typical for globe)
+
+  choked flow                not choked
+  flow regime                not checked, turbulent assumed
+  line velocity              2.76 m/s (erosional limit 3.9 m/s)
+  valve opening              required Kv 17.57 is 28 percent of rated 63
+--------------------------------------------------------------
+```
+
+Every figure that fed the answer is shown, and anything the library declined to check says so rather than being left blank, because a blank line reads as a clean bill of health.
+
+`flowcoeff gas` does the same for compressible flow and adds the Joule-Thomson estimate and the material screening. `flowcoeff fluids` and `flowcoeff valves` print the tables. `flowcoeff convert --kv 17.68` is the two second answer.
+
+Output is ASCII only, and there is a test that encodes every command's output as cp1252, because the first version used a box drawing character and crashed on the Windows console it was written for.
+
+---
+
 ## Install
 
 ```bash
@@ -146,7 +179,7 @@ pytest
 
 ## Tests
 
-62 tests, no network, no files, nothing mocked.
+81 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
