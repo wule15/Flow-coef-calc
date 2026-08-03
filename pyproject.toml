@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flow-coefficient"
+version = "0.1.0"
+description = "Valve flow coefficient calculation to IEC 60534-2-1, standard library only"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Nikola Vukadin" }]
+keywords = [
+    "valve-sizing", "flow-coefficient", "iec-60534",
+    "process-engineering", "control-valves",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Manufacturing",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+
+# No runtime dependencies. This is deliberate and is tested: see
+# tests/test_no_dependencies.py
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Source = "https://github.com/YOUR-USERNAME/flow-coefficient"
+
+[tool.setuptools.packages.find]
+include = ["flowcoefficient*"]

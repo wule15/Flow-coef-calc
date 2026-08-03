@@ -1,0 +1,305 @@
+"""
+Compressible gas and vapour sizing. IEC 60534-2-1 clause 8.
+
+    x     = ( p1 - p2 ) / p1
+    Fg    = gamma / 1.40
+    Y     = 1 - x / ( 3 * Fg * xT )
+    C     = Q / ( N9 * p1 * Y * sqrt( x / ( Gg * T1 * Z ) ) )
+
+Choked flow, clause 8.3. Gas accelerating through the vena contracta
+eventually reaches sonic velocity there, and once it does, lowering the
+downstream pressure further cannot increase the mass flow. That happens at
+
+    x >= Fg * xT
+
+Past that point x is clamped to Fg * xT, and Y takes its limiting value of
+2/3, which falls straight out of the Y equation at the limit:
+
+    Y = 1 - (Fg * xT) / (3 * Fg * xT) = 1 - 1/3 = 2/3
+
+This is the most consequential behaviour in the library. Sizing a choked
+service on the actual pressure drop instead of the limited one produces a
+coefficient smaller than the duty requires, and the valve is undersized in
+service with nothing in the number to say so. It is why this function
+returns a result object carrying is_choked rather than a bare float.
+
+The N9 constant, and why it is derived here rather than quoted
+--------------------------------------------------------------
+Unlike N1 on the liquid side, N9 is not 1 in this library's internal units,
+so it has to appear explicitly. A wrong N9 scales every gas answer by a
+constant factor and nothing else in the output looks wrong, which makes it
+the most dangerous single number in the module.
+
+It is therefore derived below from the long-established imperial form rather
+than quoted from memory, so the working is visible and checkable:
+
+    Q[scfh] = 1360 * Cv * p1[psia] * Y * sqrt( x / (Gg * T[degR] * Z) )
+
+converted to Q in Nm3/h, p in bar and T in K, with C expressed as Kv.
+
+The reference conditions differ and that matters: a normal cubic metre is
+referenced to 0 degrees C, a standard cubic foot to 60 degrees F. The
+conversion below carries that temperature ratio explicitly. Using a 15
+degrees C reference instead moves the constant by about 5 percent.
+
+VERIFY THIS AGAINST YOUR COPY OF IEC 60534-2-1 TABLE 1. The derivation is
+sound and it is checked against a worked example in the tests, but the
+standard is the authority and this is the one value in the library where a
+quiet error would be invisible in the result.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+from .coefficients import kv_to_cv
+from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError, OutOfRangeError
+from .fluids import get_fluid
+from .units import (
+    STANDARD_ATMOSPHERE_BAR,
+    convert_flow,
+    convert_temperature,
+    resolve_units,
+    to_absolute_bar,
+)
+from .materials import NOT_SCREENED, MaterialGuidance, screen_materials
+from .thermal import JouleThomsonEstimate, NOT_ESTIMATED, estimate_joule_thomson
+from .valves import resolve_xt
+
+# ── N9, derived rather than quoted. See the module docstring. ───────────────
+# Established imperial form: Q[scfh] = 1360 * Cv * p1[psia] * Y * sqrt(...)
+_IMPERIAL_GAS_CONSTANT = 1360.0
+
+# A normal cubic metre is at 0 C, a standard cubic foot at 60 F. Same
+# pressure reference to within 0.03 percent, so this is the temperature
+# ratio times the volume conversion.
+NM3_TO_SCF = (288.706 / 273.15) * 35.31467
+
+# Q[Nm3/h], p1[bar absolute], T[K], coefficient expressed as Kv.
+N9 = (
+    _IMPERIAL_GAS_CONSTANT
+    * 1.156                 # Cv per Kv
+    * 14.5037738            # psi per bar
+    / (1.8 ** 0.5)          # degR per K, under the square root
+    / NM3_TO_SCF
+)
+
+# xT is measured on air, whose ratio of specific heats is 1.40. Fg corrects
+# it to another gas. IEC 60534-2-1 clause 8.5.
+GAMMA_AIR = 1.40
+
+# The limiting expansion factor at and beyond choked flow.
+Y_CHOKED = 2.0 / 3.0
+
+
+@dataclass(frozen=True)
+class GasSizingResult:
+    """
+    A gas sizing answer.
+
+    is_choked and choked_check_performed are separate. False for both means
+    no xT was available and the library did not look, which is not the same
+    as looking and finding the valve clear.
+    """
+
+    kv: float
+    cv: float
+    is_choked: bool
+    choked_check_performed: bool
+    pressure_basis: str
+    inlet_pressure_bar_a: float
+    outlet_pressure_bar_a: float
+    pressure_drop_ratio: float
+    effective_pressure_drop_ratio: float
+    expansion_factor: float
+    limiting_ratio: float | None
+    gamma: float
+    gamma_factor: float
+    relative_density: float
+    temperature_k: float
+    compressibility: float
+    xt: float | None = None
+    xt_source: str = 'not provided'
+    fluid: str | None = None
+    joule_thomson: JouleThomsonEstimate = NOT_ESTIMATED
+    materials: MaterialGuidance = NOT_SCREENED
+
+    def __str__(self) -> str:
+        state = 'CHOKED' if self.is_choked else (
+            'not choked' if self.choked_check_performed else 'choked check not performed'
+        )
+        fluid = f', {self.fluid}' if self.fluid else ''
+        jt = ''
+        if self.joule_thomson.estimated and self.joule_thomson.warnings:
+            jt = f" | {self.joule_thomson.warnings[0]}"
+        return (
+            f"Kv {self.kv:.4g} (Cv {self.cv:.4g}) | "
+            f"inputs {self.pressure_basis}{fluid} | "
+            f"x {self.pressure_drop_ratio:.3f}, Y {self.expansion_factor:.3f} | {state}{jt}"
+        )
+
+
+def gas_flow_coefficient(
+    flow_rate: float,
+    inlet_pressure: float,
+    outlet_pressure: float,
+    pressure_basis: str,
+    temperature: float,
+    relative_density: float | None = None,
+    fluid: str | None = None,
+    gamma: float | None = None,
+    xt: float | None = None,
+    valve_style: str | None = None,
+    compressibility: float = 1.0,
+    units: str | None = None,
+    pressure_unit: str | None = None,
+    flow_unit: str | None = None,
+    temperature_unit: str | None = None,
+    atmospheric_pressure_bar: float = STANDARD_ATMOSPHERE_BAR,
+) -> GasSizingResult:
+    """
+    Flow coefficient for a gas or vapour. IEC 60534-2-1 clause 8.
+
+    Flow is volumetric at normal conditions, 0 degrees C and 101.325 kPa.
+
+    pressure_basis is required and has no default, for the same reason as on
+    the liquid side.
+
+    Worked example, air at 7 bar a falling to 5 bar a, 20 C, 500 Nm3/h,
+    through a globe valve:
+
+    >>> r = gas_flow_coefficient(
+    ...     flow_rate=500, inlet_pressure=7.0, outlet_pressure=5.0,
+    ...     pressure_basis='absolute', temperature=20, fluid='air',
+    ...     valve_style='globe')
+    >>> r.is_choked
+    False
+    >>> round(r.pressure_drop_ratio, 4)
+    0.2857
+    """
+    resolved = resolve_units(
+        units,
+        pressure=pressure_unit,
+        flow=flow_unit,
+        temperature=temperature_unit,
+    )
+
+    if flow_rate <= 0:
+        raise InvalidFlowRateError(f'flow rate must be positive, got {flow_rate}')
+    if compressibility <= 0:
+        raise InvalidFluidPropertyError(
+            f'compressibility factor must be positive, got {compressibility}'
+        )
+
+    p1 = to_absolute_bar(inlet_pressure, resolved['pressure'], pressure_basis,
+                         atmospheric_pressure_bar, 'inlet pressure')
+    p2 = to_absolute_bar(outlet_pressure, resolved['pressure'], pressure_basis,
+                         atmospheric_pressure_bar, 'outlet pressure')
+
+    if p2 > p1:
+        raise InvalidPressureError(
+            f'outlet pressure {p2:.5g} bar absolute is above inlet pressure '
+            f'{p1:.5g} bar absolute. Flow does not run up a pressure gradient.'
+        )
+    if p2 == p1:
+        raise InvalidPressureError(
+            'inlet and outlet pressure are equal, so there is no driving '
+            'pressure drop and no finite flow coefficient exists'
+        )
+
+    temperature_k = convert_temperature(temperature, resolved['temperature'], 'k')
+    if temperature_k <= 0:
+        raise OutOfRangeError('temperature', temperature_k, 0, float('inf'), 'K',
+                              context='absolute temperature cannot be zero or below')
+
+    fluid_obj = get_fluid(fluid) if fluid else None
+
+    if gamma is None:
+        gamma = fluid_obj.gamma if fluid_obj and fluid_obj.gamma else None
+    if gamma is None:
+        raise InvalidFluidPropertyError(
+            'ratio of specific heats is required. Pass gamma, or name a fluid '
+            'that carries one.'
+        )
+    if not 1.0 < gamma < 2.0:
+        raise OutOfRangeError('gamma', gamma, 1.0, 2.0,
+                              context='ratio of specific heats for real gases '
+                                      'lies between 1 and 2')
+
+    if relative_density is None:
+        relative_density = fluid_obj.gas_relative_density if fluid_obj else None
+    if relative_density is None:
+        raise InvalidFluidPropertyError(
+            'gas relative density is required. Pass relative_density, or name '
+            'a fluid.'
+        )
+    if relative_density <= 0:
+        raise InvalidFluidPropertyError(
+            f'relative density must be positive, got {relative_density}'
+        )
+
+    q = convert_flow(flow_rate, resolved['flow'], 'm3/h')
+
+    x = (p1 - p2) / p1
+    fg = gamma / GAMMA_AIR
+
+    xt_value, xt_source = resolve_xt(xt, valve_style)
+
+    is_choked = False
+    check_performed = False
+    limiting_ratio = None
+    x_effective = x
+
+    if xt_value is not None:
+        check_performed = True
+        limiting_ratio = fg * xt_value
+        if x >= limiting_ratio:
+            is_choked = True
+            x_effective = limiting_ratio
+        y = 1.0 - x_effective / (3.0 * fg * xt_value)
+    else:
+        # No xT, so the expansion factor cannot be evaluated from the
+        # standard's expression. Y = 1 is the incompressible limit and is
+        # the least wrong assumption available, but the result records that
+        # no choked check was performed so the number is not mistaken for a
+        # verified one.
+        y = 1.0
+
+    kv = q / (N9 * p1 * y * math.sqrt(x_effective / (relative_density * temperature_k * compressibility)))
+
+    jt = estimate_joule_thomson(
+        fluid_obj,
+        convert_temperature(temperature, resolved['temperature'], 'c'),
+        p1 - p2,
+    )
+
+    inlet_c = convert_temperature(temperature, resolved['temperature'], 'c')
+    materials = screen_materials(
+        minimum_c=jt.outlet_temperature_c if jt.estimated else inlet_c,
+        maximum_c=inlet_c,
+    )
+
+    return GasSizingResult(
+        kv=kv,
+        cv=kv_to_cv(kv),
+        is_choked=is_choked,
+        choked_check_performed=check_performed,
+        pressure_basis=pressure_basis.strip().lower(),
+        inlet_pressure_bar_a=p1,
+        outlet_pressure_bar_a=p2,
+        pressure_drop_ratio=x,
+        effective_pressure_drop_ratio=x_effective,
+        expansion_factor=y,
+        limiting_ratio=limiting_ratio,
+        gamma=gamma,
+        gamma_factor=fg,
+        relative_density=relative_density,
+        temperature_k=temperature_k,
+        compressibility=compressibility,
+        xt=xt_value,
+        xt_source=xt_source,
+        fluid=fluid_obj.name if fluid_obj else None,
+        joule_thomson=jt,
+        materials=materials,
+    )
