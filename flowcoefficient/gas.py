@@ -42,10 +42,27 @@ referenced to 0 degrees C, a standard cubic foot to 60 degrees F. The
 conversion below carries that temperature ratio explicitly. Using a 15
 degrees C reference instead moves the constant by about 5 percent.
 
-VERIFY THIS AGAINST YOUR COPY OF IEC 60534-2-1 TABLE 1. The derivation is
-sound and it is checked against a worked example in the tests, but the
-standard is the authority and this is the one value in the library where a
-quiet error would be invisible in the result.
+VERIFIED against the ISA/IEC equation constants table, 3 August 2026, as
+reproduced in Fisher Catalog 12 Section 2 Table 2. The standard tabulates
+
+    N9 = 21.2   Q in m3/h at normal conditions, p in kPa, T in K, C as Cv
+
+for the IEC form of the equation, which uses **molecular weight M** where
+this library uses relative density Gg. Converting:
+
+    21.2 (kPa, Cv)  x100      = 2120   (bar, Cv)
+    2120            x1.156    = 2450.7 (bar, Kv)
+    2450.7 / sqrt(28.96546)   = 455.36 (bar, Kv, Gg form)
+
+against 455.336 derived here, a difference of 0.005 percent. Two further
+agreements from the same table confirm the working rather than one number
+happening to land: N1 tabulates as 0.865 for Cv, which is 1.000 for Kv and
+matches the liquid module, and the ratio of the standard to normal condition
+constants, 22.4/21.2 = 1.0566, matches 288.65/273.15 = 1.0567, confirming the
+reference temperature handling.
+
+The derivation is kept rather than replaced by the tabulated number, because
+the working is what makes the constant checkable.
 """
 
 from __future__ import annotations

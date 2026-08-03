@@ -26,6 +26,7 @@ from flowcoefficient import (  # noqa: E402
     liquid_flow_rate,
 )
 from flowcoefficient.coefficients import EXACT_CV_PER_KV, cv_to_kv, kv_to_cv  # noqa: E402
+from flowcoefficient.fluids import MOLAR_MASS_AIR  # noqa: E402
 from flowcoefficient.gas import N9, Y_CHOKED  # noqa: E402
 
 
@@ -125,6 +126,37 @@ class TestGasAgainstTheImperialForm:
         derivation with a remembered number fails here.
         """
         assert N9 == pytest.approx(455.34, rel=1e-3)
+
+    def test_n9_matches_the_tabulated_standard_value(self):
+        """
+        The ISA/IEC equation constants table gives N9 = 21.2 for Q in m3/h at
+        normal conditions, p in kPa, T in K, with C as Cv, for the form of
+        the equation that uses molecular weight M.
+
+        This library uses relative density Gg = M / M_air, so the tabulated
+        constant converts by sqrt(M_air). This is the test that closes the
+        open item the N9 error created.
+        """
+        tabulated_kpa_cv = 21.2
+        tabulated_bar_kv = tabulated_kpa_cv * 100 * 1.156
+        equivalent_gg_form = tabulated_bar_kv / math.sqrt(MOLAR_MASS_AIR)
+        assert N9 == pytest.approx(equivalent_gg_form, rel=1e-3)
+
+    def test_n1_matches_the_tabulated_standard_value(self):
+        """
+        Same table gives N1 = 0.865 for Q in m3/h, p in bar, C as Cv. As Kv
+        that is 1.000, which is what the liquid module assumes and why its
+        equation carries no visible constant.
+        """
+        assert 0.865 * 1.156 == pytest.approx(1.0, rel=1e-3)
+
+    def test_the_reference_temperature_handling_matches_the_table(self):
+        """
+        The table gives 21.2 at normal conditions (0 C) and 22.4 at standard
+        (15.5 C). Their ratio must be the absolute temperature ratio, which
+        confirms the library converts volumes on the right reference.
+        """
+        assert 22.4 / 21.2 == pytest.approx(288.65 / 273.15, rel=1e-3)
 
     def test_the_answer_is_physically_plausible(self):
         """

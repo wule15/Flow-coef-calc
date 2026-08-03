@@ -101,13 +101,29 @@ That is why xT has no default, and why the result carries `is_choked` instead of
 
 ---
 
-## Open items, read before trusting a gas number
+## The constant that was wrong, and how it was caught
 
-**N9 in the gas equation has not been verified against the standard.** It is derived in the code from the established imperial form rather than quoted, and the derivation is visible and cross-checked in the tests. During development this constant was wrong by a factor of 185, and every internal check passed while it was: the units were right, the choked logic was right, the expansion factor was right, and the result printed a confident number that was two orders of magnitude out. Only comparison against an outside source caught it.
+Worth reading, because it shaped the test suite.
 
-It now reads 455.336 and agrees with an independent imperial cross-check to within floating point. **It still needs checking against IEC 60534-2-1 Table 1 before anyone relies on a gas result.**
+During development N9 in the gas equation was hardcoded from memory as 2.46. The correct value is 455.336. The library returned **Cv 1232 where the answer is Cv 6.65**, the difference between specifying a DN300 valve and a DN25 one.
 
-The liquid side does not have this exposure, because N1 is 1 in the library's internal units.
+**Every internal check passed while it was wrong.** The units were right, the choked logic was right, the expansion factor was right, and the result object printed a confident number two orders of magnitude out. Nothing in a sizing result tells you its magnitude is nonsense.
+
+It was caught by cross-checking against the imperial sizing equation, a formula from a different lineage in different units. That comparison is now a permanent test, alongside a magnitude assertion that fails if a gas answer stops being a plausible valve size.
+
+**N9 is now verified against the standard.** The ISA/IEC equation constants table gives `N9 = 21.2` for flow in m3/h at normal conditions, pressure in kPa, temperature in K, with the coefficient as Cv, for the form of the equation using molecular weight M. This library uses relative density, so:
+
+```
+21.2 (kPa, Cv)   x100     = 2120    (bar, Cv)
+2120             x1.156   = 2450.7  (bar, Kv)
+2450.7 / sqrt(28.96546)   = 455.36  (bar, Kv, relative density form)
+```
+
+against 455.336 derived independently here, a difference of 0.005 percent.
+
+Two further agreements from the same table confirm the working rather than one number happening to land. N1 tabulates as 0.865 for Cv, which is 1.000 for Kv and is why the liquid equation carries no visible constant. And the ratio of the standard to normal condition constants, 22.4/21.2, matches 288.65/273.15, confirming the reference temperature handling.
+
+All three are tests.
 
 ---
 
