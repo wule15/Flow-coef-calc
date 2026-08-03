@@ -35,7 +35,8 @@ from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .regime import FlowRegime, NOT_CHECKED, screen
 from .thermal import flow_from_thermal_duty
 from .units import (STANDARD_ATMOSPHERE_BAR, convert_flow, convert_temperature,
-                    resolve_units, to_absolute_bar)
+                    resolve_units, to_absolute_bar,
+                    validate_pressure_drop)
 from .valves import get_valve_style, resolve_fl
 
 
@@ -172,16 +173,7 @@ def liquid_flow_coefficient(
                 f'physical pressure'
             )
 
-    if p2 > p1:
-        raise InvalidPressureError(
-            f'outlet pressure {p2:.5g} bar absolute is above inlet pressure '
-            f'{p1:.5g} bar absolute. Flow does not run up a pressure gradient.'
-        )
-    if p2 == p1:
-        raise InvalidPressureError(
-            'inlet and outlet pressure are equal, so there is no driving '
-            'pressure drop and no finite flow coefficient exists'
-        )
+    validate_pressure_drop(p1, p2)
 
     # ── Fluid properties ────────────────────────────────────────────────────
     fluid_obj = get_fluid(fluid) if fluid else None

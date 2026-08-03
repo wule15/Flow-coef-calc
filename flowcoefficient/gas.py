@@ -62,6 +62,7 @@ from .units import (
     convert_temperature,
     resolve_units,
     to_absolute_bar,
+    validate_pressure_drop,
 )
 from .materials import NOT_SCREENED, MaterialGuidance, screen_materials
 from .thermal import JouleThomsonEstimate, NOT_ESTIMATED, estimate_joule_thomson
@@ -197,16 +198,7 @@ def gas_flow_coefficient(
     p2 = to_absolute_bar(outlet_pressure, resolved['pressure'], pressure_basis,
                          atmospheric_pressure_bar, 'outlet pressure')
 
-    if p2 > p1:
-        raise InvalidPressureError(
-            f'outlet pressure {p2:.5g} bar absolute is above inlet pressure '
-            f'{p1:.5g} bar absolute. Flow does not run up a pressure gradient.'
-        )
-    if p2 == p1:
-        raise InvalidPressureError(
-            'inlet and outlet pressure are equal, so there is no driving '
-            'pressure drop and no finite flow coefficient exists'
-        )
+    validate_pressure_drop(p1, p2)
 
     temperature_k = convert_temperature(temperature, resolved['temperature'], 'k')
     if temperature_k <= 0:

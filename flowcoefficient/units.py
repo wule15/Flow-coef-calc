@@ -236,3 +236,25 @@ def resolve_units(system: str | None, **overrides: str | None) -> dict[str, str]
         if unit is not None:
             resolved[quantity] = _normalise(unit)
     return resolved
+
+
+def validate_pressure_drop(inlet_bar_a: float, outlet_bar_a: float) -> float:
+    """
+    Check two absolute pressures describe a real flow, and return the drop.
+
+    Both sizing modules need this and neither should carry its own copy: a
+    message that drifts between liquid and gas is a message somebody stops
+    trusting.
+    """
+    if outlet_bar_a > inlet_bar_a:
+        raise InvalidPressureError(
+            f'outlet pressure {outlet_bar_a:.5g} bar absolute is above inlet '
+            f'pressure {inlet_bar_a:.5g} bar absolute. Flow does not run up a '
+            f'pressure gradient.'
+        )
+    if outlet_bar_a == inlet_bar_a:
+        raise InvalidPressureError(
+            'inlet and outlet pressure are equal, so there is no driving '
+            'pressure drop and no finite flow coefficient exists'
+        )
+    return inlet_bar_a - outlet_bar_a

@@ -26,7 +26,7 @@ from flowcoefficient import (  # noqa: E402
     liquid_flow_rate,
 )
 from flowcoefficient.coefficients import EXACT_CV_PER_KV, cv_to_kv, kv_to_cv  # noqa: E402
-from flowcoefficient.gas import N9  # noqa: E402
+from flowcoefficient.gas import N9, Y_CHOKED  # noqa: E402
 
 
 class TestKvCvIsAUnitConversion:
@@ -154,7 +154,8 @@ class TestChokedGasLimits:
             relative_density=1.0, gamma=1.4, xt=0.75,
         )
         assert r.is_choked
-        assert r.expansion_factor == pytest.approx(2.0 / 3.0, rel=1e-12)
+        assert r.expansion_factor == pytest.approx(Y_CHOKED, rel=1e-12)
+        assert Y_CHOKED == pytest.approx(2.0 / 3.0, rel=1e-12)
 
     def test_x_is_clamped_to_the_limiting_ratio(self):
         r = gas_flow_coefficient(
