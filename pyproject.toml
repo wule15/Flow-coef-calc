@@ -34,7 +34,7 @@ dev = ["pytest>=8.0"]
 flowcoeff = "flowcoefficient.cli:main"
 
 [project.urls]
-Source = "https://github.com/wule15/flow-coefficient"
+Source = "https://github.com/wule15/Flow-coef-calc"
 
 [tool.setuptools.packages.find]
 include = ["flowcoefficient*"]

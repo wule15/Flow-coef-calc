@@ -164,8 +164,8 @@ Output is ASCII only, and there is a test that encodes every command's output as
 ## Install
 
 ```bash
-git clone https://github.com/wule15/flow-coefficient.git
-cd flow-coefficient
+git clone https://github.com/wule15/Flow-coef-calc.git
+cd Flow-coef-calc
 pip install -e .
 ```
 
