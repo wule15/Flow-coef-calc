@@ -70,9 +70,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .checks import (OpeningCheck, VELOCITY_NOT_CHECKED, VelocityCheck,
+                     check_opening, check_velocity)
 from .coefficients import kv_to_cv
 from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError, OutOfRangeError
-from .fluids import get_fluid
+from .fluids import MOLAR_MASS_AIR, get_fluid
+from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .units import (
     STANDARD_ATMOSPHERE_BAR,
     convert_flow,
@@ -149,6 +152,10 @@ class GasSizingResult:
     fluid: str | None = None
     joule_thomson: JouleThomsonEstimate = NOT_ESTIMATED
     materials: MaterialGuidance = NOT_SCREENED
+    piping: PipingGeometry = FP_NOT_APPLIED
+    kv_bare_valve: float = 0.0
+    velocity: VelocityCheck = VELOCITY_NOT_CHECKED
+    opening: OpeningCheck = OpeningCheck(False, 0.0, None, None, ())
 
     def __str__(self) -> str:
         state = 'CHOKED' if self.is_choked else (
@@ -158,6 +165,11 @@ class GasSizingResult:
         jt = ''
         if self.joule_thomson.estimated and self.joule_thomson.warnings:
             jt = f" | {self.joule_thomson.warnings[0]}"
+        if self.piping.checked and self.piping.fp < 1.0:
+            jt = f" | Fp {self.piping.fp:.3g}" + jt
+        for check in (self.velocity, self.opening):
+            if check.warnings:
+                jt += f" | {check.warnings[0]}"
         return (
             f"Kv {self.kv:.4g} (Cv {self.cv:.4g}) | "
             f"inputs {self.pressure_basis}{fluid} | "
@@ -180,6 +192,10 @@ def gas_flow_coefficient(
     xt: float | None = None,
     valve_style: str | None = None,
     compressibility: float = 1.0,
+    valve_diameter_mm: float | None = None,
+    pipe_diameter_mm: float | None = None,
+    downstream_diameter_mm: float | None = None,
+    rated_kv: float | None = None,
     units: str | None = None,
     pressure_unit: str | None = None,
     flow_unit: str | None = None,
@@ -270,6 +286,12 @@ def gas_flow_coefficient(
     limiting_ratio = None
     x_effective = x
 
+    jt_estimate = estimate_joule_thomson(
+        fluid_obj,
+        convert_temperature(temperature, resolved['temperature'], 'c'),
+        p1 - p2,
+    )
+
     expansion_source = 'from xT'
     if xt_value is not None:
         check_performed = True
@@ -300,18 +322,49 @@ def gas_flow_coefficient(
             f'{x:.3g}, below {Y_ASSUMPTION_LIMIT}.'
         )
 
-    kv = q / (N9 * p1 * y * math.sqrt(x_effective / (relative_density * temperature_k * compressibility)))
+    kv_bare = q / (N9 * p1 * y * math.sqrt(x_effective / (relative_density * temperature_k * compressibility)))
 
-    jt = estimate_joule_thomson(
-        fluid_obj,
-        convert_temperature(temperature, resolved['temperature'], 'c'),
-        p1 - p2,
+    # Fp applies to gas exactly as it does to liquid. IEC 60534-2-1 clause 5
+    # is not liquid specific; the reducers restrict the assembly whatever is
+    # flowing through it.
+    piping = piping_geometry_factor(
+        rated_kv=rated_kv,
+        valve_diameter_mm=valve_diameter_mm,
+        upstream_diameter_mm=pipe_diameter_mm,
+        downstream_diameter_mm=downstream_diameter_mm,
     )
+    kv = kv_bare / piping.fp
+
+    # Velocity, evaluated at the OUTLET. Gas expands through the valve, so
+    # the outlet is where density is lowest and velocity highest, and that is
+    # where erosion and noise are decided. Density from the ideal gas law
+    # with the supplied compressibility factor.
+    #
+    #   rho2 = p2 * M / (Z * R * T2)
+    #
+    # T2 uses the Joule-Thomson estimate when one exists, because a gas that
+    # has cooled 60 K is denser than the inlet temperature would suggest.
+    outlet_velocity = VELOCITY_NOT_CHECKED
+    if pipe_diameter_mm:
+        molar_mass_kg = relative_density * MOLAR_MASS_AIR / 1000.0
+        t2_k = temperature_k
+        if jt_estimate is not None and jt_estimate.estimated:
+            t2_k = jt_estimate.outlet_temperature_c + 273.15
+        rho2 = (p2 * 1.0e5) * molar_mass_kg / (compressibility * 8.31446 * t2_k)
+        # Normal conditions to outlet conditions, ideal gas.
+        q_actual = q * (1.01325 / p2) * (t2_k / 273.15)
+        outlet_velocity = check_velocity(
+            flow_rate_m3h=q_actual,
+            pipe_diameter_mm=pipe_diameter_mm,
+            density_kg_m3=rho2,
+            is_gas=True,
+        )
+
 
     inlet_c = convert_temperature(temperature, resolved['temperature'], 'c')
-    if jt.estimated:
+    if jt_estimate.estimated:
         materials = screen_materials(
-            minimum_c=jt.outlet_temperature_c,
+            minimum_c=jt_estimate.outlet_temperature_c,
             maximum_c=inlet_c,
         )
     else:
@@ -342,6 +395,10 @@ def gas_flow_coefficient(
         xt_source=xt_source,
         expansion_factor_source=expansion_source,
         fluid=fluid_obj.name if fluid_obj else None,
-        joule_thomson=jt,
+        joule_thomson=jt_estimate,
         materials=materials,
+        piping=piping,
+        kv_bare_valve=kv_bare,
+        velocity=outlet_velocity,
+        opening=check_opening(kv, rated_kv),
     )

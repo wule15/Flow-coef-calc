@@ -66,7 +66,7 @@ print(result.opening)
 
 **Material screening** by temperature, ASME grade and EN number side by side, because the same casting is called A216 WCB in one datasheet and 1.0619 GP240GH in another.
 
-**Velocity and oversizing checks** when you supply a pipe diameter or a candidate valve's rated coefficient.
+**Velocity and oversizing checks** when you supply a pipe diameter or a candidate valve's rated coefficient. On gas, velocity is evaluated at the outlet, where the gas has expanded and is moving fastest, and it carries the rho v squared criterion for noise and erosion.
 
 ---
 
@@ -96,7 +96,8 @@ That is why xT has no default, and why the result carries `is_choked` instead of
 - **The Reynolds number factor FR is not implemented.** Viscous flow is screened and reported, not corrected. A transitional or laminar answer comes back labelled and should not be trusted as it stands.
 - Cavitation is detected at full choking only. Damage can begin before that point and the library will not flag it.
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
-- Material screening is on temperature alone. It excludes grades, it does not select one.
+- Material screening is on temperature alone, and runs on the gas path only, since it exists to catch Joule-Thomson cooling. It excludes grades, it does not select one.
+- Liquid density is not corrected for temperature. The result says so when the flowing temperature is far from the tabulated one.
 - The Joule-Thomson figure is an order of magnitude estimate, not a design number.
 - No graphical or web interface yet. There is a library and a command line tool.
 
@@ -180,7 +181,7 @@ pytest
 
 ## Tests
 
-99 tests, no network, no files, nothing mocked.
+175 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
