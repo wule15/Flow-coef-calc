@@ -194,20 +194,32 @@ def liquid_flow_coefficient(
     if relative_density is not None:
         relative_density_source = 'supplied'
     elif fluid_obj is not None:
-        if fluid_obj.relative_density_15c is None:
+        tabulated = fluid_obj.relative_density
+        if tabulated is None:
             raise InvalidFluidPropertyError(
-                f'no liquid relative density is held for {fluid_obj.name}, so '
-                f'it cannot be sized as a liquid without one. '
-                f'{fluid_obj.note or ""} Pass relative_density explicitly, at '
-                f'the flowing temperature, or size it with '
-                f'gas_flow_coefficient if it is a gas in this service.'
+                f'{fluid_obj.name} has no liquid density in the table, because '
+                f'it is not sized as a liquid. Pass relative_density '
+                f'explicitly if you have it, or use gas_flow_coefficient.'
             )
-        relative_density = fluid_obj.relative_density_15c
+        relative_density = tabulated
+        ref_c = fluid_obj.liquid_density_temperature_c
         relative_density_source = (
-            f'tabulated for {fluid_obj.name} at 15 C. Liquid density falls '
-            f'with temperature and this is not corrected, so supply it '
-            f'explicitly for hot service.'
+            f'tabulated for {fluid_obj.name}, {fluid_obj.liquid_density_kg_m3:.4g} '
+            f'kg/m3 at {ref_c:.4g} C. {fluid_obj.liquid_density_note}'
         )
+        # Liquid density falls with temperature and this library does not
+        # correct for it. Roughly 4 percent for water between 15 and 100 C,
+        # and Kv goes with the square root of density, so about 2 percent on
+        # the answer. Small, but it should not be silent.
+        if temperature is not None:
+            flowing_c = convert_temperature(temperature, resolved['temperature'], 'c')
+            if abs(flowing_c - ref_c) > 30.0:
+                relative_density_source += (
+                    f' NOT CORRECTED to the flowing temperature of '
+                    f'{flowing_c:.4g} C, a difference of {abs(flowing_c-ref_c):.0f} C. '
+                    f'Supply relative_density at the flowing condition for a '
+                    f'sizing that has to be right.'
+                )
     else:
         relative_density = 1.0
         relative_density_source = 'assumed 1.0, no fluid named and none supplied'

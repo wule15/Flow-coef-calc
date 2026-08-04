@@ -91,13 +91,31 @@ class Fluid:
     critical_temperature_k: float
     gamma: float | None = None             # ratio of specific heats, gases
     antoine: Antoine | None = None
-    relative_density_15c: float | None = None   # liquids, water at 15 C = 1
+    liquid_density_kg_m3: float | None = None
+    liquid_density_temperature_c: float | None = None
+    liquid_density_note: str = ''
     specific_heat_kj_kgk: float | None = None   # cp, liquids, at reference T
     specific_heat_reference_c: float | None = None
     jt_coefficient_k_per_bar: float | None = None
     jt_reference: str = ''
     source: str = ''
     note: str = ''
+
+    @property
+    def relative_density(self) -> float | None:
+        """
+        Liquid density relative to water at 15 C, at the temperature the
+        density below was measured at.
+
+        Held as an absolute density with its own reference temperature rather
+        than as a bare number at 15 C, because most of these fluids are not
+        liquid at 15 C. Nitrogen is a liquid at minus 196 and is 0.81 there;
+        a field called relative_density_15c simply had nothing to say about
+        it, which made the library refuse a duty it should be able to size.
+        """
+        if self.liquid_density_kg_m3 is None:
+            return None
+        return self.liquid_density_kg_m3 / WATER_DENSITY_15C
 
     @property
     def gas_relative_density(self) -> float:
@@ -134,7 +152,9 @@ FLUIDS: dict[str, Fluid] = {
             min_k=255.9, max_k=373.0,
             source=f'{_NIST}, Stull 1947',
         ),
-        relative_density_15c=1.0,
+        liquid_density_kg_m3=999.1,
+        liquid_density_temperature_c=15.0,
+        liquid_density_note='the reference fluid; density falls to 958 at 100 C',
         specific_heat_kj_kgk=4.186,
         specific_heat_reference_c=15.0,
         source=f'{_NIST}. cp at 15 C, IAPWS-95. cp varies about 1 percent '
@@ -160,6 +180,11 @@ FLUIDS: dict[str, Fluid] = {
         critical_pressure_bar=37.86,
         critical_temperature_k=132.53,
         gamma=1.400,
+        liquid_density_kg_m3=874.0,
+        liquid_density_temperature_c=-194.3,
+        liquid_density_note='saturated liquid at the normal boiling point. '
+                            'Air is a mixture and boils over a range, so this '
+                            'is approximate',
         specific_heat_kj_kgk=1.005,
         specific_heat_reference_c=20.0,
         jt_coefficient_k_per_bar=0.25,
@@ -179,6 +204,9 @@ FLUIDS: dict[str, Fluid] = {
             min_k=63.14, max_k=126.0,
             source=f'{_NIST}, Edejer and Thodos 1967',
         ),
+        liquid_density_kg_m3=806.1,
+        liquid_density_temperature_c=-195.8,
+        liquid_density_note='saturated liquid at the normal boiling point, 77.4 K',
         jt_coefficient_k_per_bar=0.22,
         jt_reference='at 20 C and moderate pressure',
         source=f'{_NIST}',
@@ -195,6 +223,10 @@ FLUIDS: dict[str, Fluid] = {
             min_k=90.99, max_k=189.99,
             source=f'{_NIST}, Prydz and Goodwin 1972',
         ),
+        liquid_density_kg_m3=422.4,
+        liquid_density_temperature_c=-161.5,
+        liquid_density_note='saturated liquid at the normal boiling point, '
+                            '111.7 K. This is LNG density',
         jt_coefficient_k_per_bar=0.45,
         jt_reference='at 20 C and moderate pressure. The value that makes '
                      'gas letdown stations ice up.',
@@ -214,6 +246,11 @@ FLUIDS: dict[str, Fluid] = {
             min_k=154.26, max_k=195.89,
             source=f'{_NIST}, Giauque and Egan 1937',
         ),
+        liquid_density_kg_m3=1178.0,
+        liquid_density_temperature_c=-56.6,
+        liquid_density_note='saturated liquid at the triple point. CO2 has no '
+                            'normal boiling point, it sublimes at 1 atm, so '
+                            'liquid CO2 only exists above 5.2 bar',
         jt_coefficient_k_per_bar=1.10,
         jt_reference='at 20 C and moderate pressure. Large, and the reason '
                      'CO2 letdown freezes solid.',
@@ -233,7 +270,10 @@ FLUIDS: dict[str, Fluid] = {
             min_k=239.6, max_k=371.5,
             source=f'{_NIST}, Overstreet and Giauque 1937',
         ),
-        relative_density_15c=0.62,
+        liquid_density_kg_m3=618.0,
+        liquid_density_temperature_c=15.0,
+        liquid_density_note='saturated liquid under its own vapour pressure, '
+                            'about 7.3 bar at 15 C',
         specific_heat_kj_kgk=4.70,
         specific_heat_reference_c=20.0,
         jt_coefficient_k_per_bar=2.5,
