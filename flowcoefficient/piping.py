@@ -40,18 +40,32 @@ valve opening.
 
 The N2 constant
 ---------------
-N2 = 0.00286 for d in mm with C expressed as Kv.
+N2 = 0.00160 for d in mm with C expressed as Kv.
 
-Derived rather than quoted, on the same principle as N9 in the gas module.
 The published table gives 890 for d in inches and 0.00214 for millimetres,
 both with C as Cv. Those two must differ by exactly the fourth power of the
 inch-to-millimetre ratio, because the constant sits under (C/d^2)^2:
 
     890 / 25.4^4 = 890 / 416231 = 0.002138   ->  0.00214, confirming the pair
 
-    0.00214 * 1.156^2 = 0.00286              ->  as Kv
+Converting from Cv to Kv **divides**, and getting that direction wrong is how
+this constant shipped wrong once already. C is squared in the numerator, so
+expressing it as Cv makes that term 1.156^2 larger; to leave Fp unchanged N2
+must be 1.156^2 larger too. Therefore N2 for Kv is the smaller number:
 
-The 1.156 squared is the Cv per Kv ratio, squared because C appears squared.
+    0.00214 / 1.156^2 = 0.00160              ->  as Kv
+
+A derivation that touches the published table nowhere, as a second opinion.
+Valve resistance K = dP / (0.5 * rho * v^2) with v = 353.678 * Q / d^2 in
+m/s for Q in m3/h and d in mm, and dP = SG * (Q/Kv)^2 in bar by the
+definition of Kv:
+
+    N2 = 2e5 / (1000 * 353.678^2) = 0.001599
+
+Both give 0.00160. The earlier value of 0.00286 was this conversion applied
+backwards, which made Fp too close to 1, which made the required coefficient
+too small, which undersizes the valve. Up to 15 percent low on a reduced bore
+ball installation.
 """
 
 from __future__ import annotations
@@ -61,8 +75,8 @@ from dataclasses import dataclass
 
 from .errors import OutOfRangeError
 
-# d in mm, C as Kv. See the module docstring for the derivation.
-N2 = 0.00286
+# d in mm, C as Kv. See the module docstring for both derivations.
+N2 = 0.00160
 
 # The published imperial value, kept so the derivation above stays checkable.
 N2_INCH_CV = 890.0
@@ -120,7 +134,7 @@ def piping_geometry_factor(
 
     >>> g = piping_geometry_factor(63, 50, 80)
     >>> round(g.fp, 4)
-    0.9434
+    0.905
 
     The same valve in the same line size as itself has no reducers and so no
     correction:

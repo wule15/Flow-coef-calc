@@ -32,13 +32,31 @@ class TestN2IsSelfConsistent:
         assert N2_INCH_CV / published_mm_cv == pytest.approx(25.4 ** 4, rel=1e-3)
 
     def test_the_library_constant_is_the_published_one_converted_to_kv(self):
+        """
+        DIVIDE, do not multiply. C is squared in the numerator, so expressing
+        it as Cv makes that term 1.156^2 larger and N2 must be 1.156^2 larger
+        with it. N2 for Kv is therefore the smaller number. This assertion
+        exists because the conversion shipped backwards once, which made Fp
+        too close to 1 and undersized every reduced bore valve.
+        """
         published_mm_cv = 0.00214
-        assert N2 == pytest.approx(published_mm_cv * 1.156 ** 2, rel=1e-3)
+        assert N2 == pytest.approx(published_mm_cv / 1.156 ** 2, rel=1e-3)
+        assert N2 < published_mm_cv, 'N2 for Kv must be smaller than for Cv'
+
+    def test_a_second_derivation_that_never_touches_the_table(self):
+        """
+        Valve resistance K = dP / (0.5 rho v^2), with v = 353.678 Q / d^2 in
+        m/s for Q in m3/h and d in mm, and dP = SG (Q/Kv)^2 in bar from the
+        definition of Kv. Independent of the published constants entirely.
+        """
+        from_physics = 2e5 / (1000 * 353.678 ** 2)
+        assert N2 == pytest.approx(from_physics, rel=2e-3)
 
     def test_the_reynolds_screening_uses_the_same_constant(self):
         """
         Two copies of a constant are two copies that drift. regime.py held
-        1.60e-3 for a while, which was simply wrong.
+        1.60e-3, which was correct, and it was briefly replaced with a value
+        that was not. Keeping one copy is what stops that recurring.
         """
         assert REGIME_N2 == N2
 
@@ -51,12 +69,24 @@ class TestFpAgainstHandCalculation:
         (1 - that) = 0.609375, squared    = 0.371338
         sum_Z      = 1.5 * 0.371338       = 0.557007
         (C/d^2)^2  = (63/2500)^2          = 0.000635
-        Fp         = 1/sqrt(1 + (0.557007/0.00286) * 0.000635)
-                                          = 0.9434
+        Fp         = 1/sqrt(1 + (0.557007/0.00160) * 0.000635)
+                                          = 0.9050
     """
 
     def test_matches_the_hand_calculation(self):
-        assert piping_geometry_factor(63, 50, 80).fp == pytest.approx(0.9434, rel=1e-3)
+        assert piping_geometry_factor(63, 50, 80).fp == pytest.approx(0.9050, rel=1e-3)
+
+    def test_fp_is_not_flattered_by_a_wrong_constant(self):
+        """
+        Guards the direction of the error that shipped. With N2 too large Fp
+        drifts towards 1 and the required coefficient comes out too small, so
+        the failure is an undersized valve rather than a visible wrong number.
+        A reduced bore ball is where it bit hardest.
+        """
+        assert piping_geometry_factor(800, 100, 150).fp == pytest.approx(0.5922, rel=1e-3)
+        assert piping_geometry_factor(800, 100, 150).fp < 0.70, (
+            'if this passes at 0.70 or above, N2 has been inflated again'
+        )
 
     def test_the_terms_are_reported_so_the_number_can_be_checked(self):
         g = piping_geometry_factor(63, 50, 80)

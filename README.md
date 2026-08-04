@@ -58,7 +58,7 @@ print(result.opening)
 
 **Seven valve styles** with typical FL, xT and Fd. Supplying your own beats the typical value, and the result records which it used.
 
-**Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 6 percent, and without the correction the sizing is optimistic by exactly that much.
+**Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 9.5 percent, and a reduced bore ball in a line two sizes up can lose 40 percent. Without the correction the sizing is optimistic by exactly that much.
 
 **Flow regime screening.** Give it a viscosity and it works out the valve Reynolds number and tells you if the flow left the turbulent range the equations assume.
 
