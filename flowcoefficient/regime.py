@@ -43,8 +43,10 @@ from .errors import InvalidFluidPropertyError
 # IEC 60534-2-1 Table 1. Q in m3/h, kinematic viscosity in mm2/s, C as Kv.
 N4 = 7.07e4
 
-# IEC 60534-2-1 Table 1. D in mm, C as Kv.
-N2 = 1.60e-3
+# IEC 60534-2-1 Table 1. D in mm, C as Kv. Imported from the piping module
+# so there is one value rather than two that can drift apart. It was 1.60e-3
+# here and that was wrong; see the derivation in piping.py.
+from .piping import N2  # noqa: E402
 
 # IEC treats flow as fully turbulent above 10 000 and fully laminar below
 # about 10. Between the two the FR correction applies on a curve.

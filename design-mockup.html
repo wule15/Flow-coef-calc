@@ -1,0 +1,183 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flow-coefficient</title>
+<style>
+  /* One typeface. Monospace throughout, because every meaningful thing on
+     this page is a number and numbers should line up. */
+  :root {
+    --paper: #fbfaf7;
+    --ink:   #16150f;
+    --faint: #8a877c;
+    --rule:  #d6d3c8;
+    --flag:  #8a1c10;
+    --field: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14140f; --ink: #e6e3d7; --faint: #85826f;
+      --rule: #33322a; --flag: #d4796a; --field: #1c1b15;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem;
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.55 ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet { max-width: 62rem; margin: 0 auto; }
+
+  /* Masthead: a line of text, not a hero. */
+  header { border-bottom: 1px solid var(--ink); padding-bottom: .5rem; margin-bottom: 2rem; }
+  header b { font-weight: 600; letter-spacing: .02em; }
+  header span { color: var(--faint); }
+
+  .cols { display: grid; grid-template-columns: 20rem 1fr; gap: 3rem; align-items: start; }
+  @media (max-width: 46rem) { .cols { grid-template-columns: 1fr; gap: 2rem; } }
+
+  h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 .9rem; padding-bottom: .35rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  h2 + h2 { margin-top: 2rem; }
+
+  /* Fields: a rule under the value, never a box. */
+  label { display: block; margin-bottom: .85rem; }
+  label i { font-style: normal; display: block; color: var(--faint); font-size: 11px; letter-spacing: .04em; }
+  input, select {
+    width: 100%; font: inherit; color: inherit; background: var(--field);
+    border: 0; border-bottom: 1px solid var(--rule); border-radius: 0;
+    padding: .3rem 0; margin-top: .1rem; appearance: none;
+  }
+  input:focus, select:focus { outline: 0; border-bottom-color: var(--ink); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .9rem; }
+
+  button {
+    font: inherit; letter-spacing: .06em; text-transform: uppercase;
+    background: var(--ink); color: var(--paper);
+    border: 0; border-radius: 0; padding: .55rem 1.1rem; margin-top: .6rem;
+    cursor: pointer;
+  }
+
+  /* The answer. Big, but set in the same face as everything else. */
+  .answer { display: flex; gap: 2.5rem; align-items: baseline; margin-bottom: .25rem; }
+  .answer div { display: flex; gap: .6rem; align-items: baseline; }
+  .answer u { text-decoration: none; color: var(--faint); font-size: 11px; letter-spacing: .08em; }
+  .answer strong { font-size: 30px; font-weight: 500; letter-spacing: -.01em; }
+  .verdict { color: var(--faint); margin-bottom: 1.6rem; }
+  .verdict.hot { color: var(--flag); }
+
+  /* Readout rows with leaders, like a calculation sheet. */
+  dl { margin: 0; }
+  .row { display: flex; align-items: baseline; gap: .5rem; padding: .18rem 0; }
+  .row dt { color: var(--faint); white-space: nowrap; }
+  .row .lead { flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-3px); }
+  .row dd { margin: 0; white-space: nowrap; }
+  .row dd.skip { color: var(--faint); }
+  .row dd.hot { color: var(--flag); }
+
+  .notes { margin-top: 1.6rem; border-top: 1px solid var(--rule); padding-top: .9rem; }
+  .notes p { margin: 0 0 .5rem; padding-left: 1.4rem; text-indent: -1.4rem; }
+  .notes p::before { content: "!  "; color: var(--flag); }
+  .notes p.plain::before { content: "   "; }
+  .notes small { color: var(--faint); display: block; margin-top: .8rem; line-height: 1.5; }
+
+  footer { margin-top: 3rem; border-top: 1px solid var(--rule); padding-top: .8rem; color: var(--faint); }
+  footer a { color: inherit; }
+</style>
+
+<div class="sheet">
+
+  <header>
+    <b>flow-coefficient</b> <span>&nbsp;&nbsp;valve sizing to IEC 60534-2-1</span>
+  </header>
+
+  <div class="cols">
+
+    <form>
+      <h2>Service</h2>
+      <label><i>fluid</i>
+        <select><option>water</option><option>steam</option><option>air</option>
+        <option>nitrogen</option><option>methane</option><option>carbon dioxide</option>
+        <option>ammonia</option></select></label>
+      <label><i>phase</i>
+        <select><option>liquid</option><option>gas or vapour</option></select></label>
+      <label><i>temperature &nbsp;C</i><input value="80"></label>
+
+      <h2>Duty</h2>
+      <label><i>flow rate &nbsp;m3/h</i><input value="25"></label>
+      <div class="pair">
+        <label><i>inlet</i><input value="6.0"></label>
+        <label><i>outlet</i><input value="4.0"></label>
+      </div>
+      <label><i>pressure basis</i>
+        <select><option>absolute</option><option>gauge</option></select></label>
+
+      <h2>Valve</h2>
+      <label><i>style</i>
+        <select><option>globe</option><option>globe cage</option><option>angle</option>
+        <option>butterfly</option><option>ball</option><option>segmented ball</option>
+        <option>eccentric plug</option></select></label>
+      <div class="pair">
+        <label><i>FL</i><input placeholder="typical"></label>
+        <label><i>xT</i><input placeholder="typical"></label>
+      </div>
+      <div class="pair">
+        <label><i>pipe bore mm</i><input placeholder="optional"></label>
+        <label><i>rated Kv</i><input placeholder="optional"></label>
+      </div>
+
+      <button>Calculate</button>
+    </form>
+
+    <main>
+      <h2>Result</h2>
+
+      <div class="answer">
+        <div><u>Kv</u><strong>17.68</strong></div>
+        <div><u>Cv</u><strong>20.44</strong></div>
+      </div>
+      <p class="verdict">water at 80 C &nbsp;·&nbsp; inputs absolute &nbsp;·&nbsp; not choked</p>
+
+      <dl>
+        <div class="row"><dt>inlet</dt><span class="lead"></span><dd>6.000 bar a</dd></div>
+        <div class="row"><dt>outlet</dt><span class="lead"></span><dd>4.000 bar a</dd></div>
+        <div class="row"><dt>pressure drop</dt><span class="lead"></span><dd>2.000 bar</dd></div>
+        <div class="row"><dt>relative density</dt><span class="lead"></span><dd>1.000</dd></div>
+        <div class="row"><dt>vapour pressure</dt><span class="lead"></span><dd>0.4742 bar</dd></div>
+        <div class="row"><dt>FF</dt><span class="lead"></span><dd>0.9470</dd></div>
+        <div class="row"><dt>FL</dt><span class="lead"></span><dd>0.900 typical, globe</dd></div>
+        <div class="row"><dt>choked flow</dt><span class="lead"></span><dd>checked, not choked</dd></div>
+        <div class="row"><dt>flow regime</dt><span class="lead"></span><dd class="skip">not checked, no viscosity</dd></div>
+        <div class="row"><dt>line velocity</dt><span class="lead"></span><dd class="skip">not checked, no bore</dd></div>
+      </dl>
+
+      <h2 style="margin-top:2.4rem">Result &nbsp;·&nbsp; same duty, ball valve, CO2 at 60 bar</h2>
+
+      <div class="answer">
+        <div><u>Kv</u><strong>2.789</strong></div>
+        <div><u>Cv</u><strong>3.224</strong></div>
+      </div>
+      <p class="verdict hot">carbon dioxide &nbsp;·&nbsp; inputs absolute &nbsp;·&nbsp; CHOKED, x limited to 0.6905</p>
+
+      <dl>
+        <div class="row"><dt>x</dt><span class="lead"></span><dd class="hot">0.9167 &nbsp;limited to 0.6905</dd></div>
+        <div class="row"><dt>Y</dt><span class="lead"></span><dd>0.6667</dd></div>
+        <div class="row"><dt>xT</dt><span class="lead"></span><dd>0.750 typical, globe</dd></div>
+        <div class="row"><dt>Joule-Thomson</dt><span class="lead"></span><dd class="hot">-60.5 K, outlet approx -41 C</dd></div>
+        <div class="row"><dt>material</dt><span class="lead"></span><dd class="hot">carbon steel excluded</dd></div>
+      </dl>
+
+      <div class="notes">
+        <p>Outlet below -29 C. Carbon steel is outside its ASME B31.3 impact test exemption and a low temperature material is required.</p>
+        <p class="plain">Suitable: A352 LCB / 1.6220 G20Mn5 &nbsp;·&nbsp; A352 LC3 / 1.5638 G9Ni10 &nbsp;·&nbsp; A351 CF8M / 1.4408 GX5CrNiMo19-11-2</p>
+        <p class="plain">Excluded: A216 WCB / 1.0619 GP240GH &nbsp;·&nbsp; A217 WC6 / 1.7357 G17CrMo5-5</p>
+        <small>Screened on temperature only. Material selection is normally decided by corrosion and compatibility with the process fluid, by pressure class, and by the client specification, none of which this tool knows. Treat this as an exclusion list, not a recommendation.</small>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    IEC 60534-2-1 &nbsp;·&nbsp; FR and Fp not implemented &nbsp;·&nbsp; runs locally, nothing leaves this machine
+  </footer>
+</div>

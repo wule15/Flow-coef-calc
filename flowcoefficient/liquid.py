@@ -32,6 +32,7 @@ from .checks import (OpeningCheck, VELOCITY_NOT_CHECKED, VelocityCheck,
 from .coefficients import kv_to_cv
 from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
+from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
 from .thermal import flow_from_thermal_duty
 from .units import (STANDARD_ATMOSPHERE_BAR, convert_flow, convert_temperature,
@@ -69,6 +70,8 @@ class LiquidSizingResult:
     flow_rate_m3h: float = 0.0
     flow_source: str = 'supplied'
     velocity: VelocityCheck = VELOCITY_NOT_CHECKED
+    piping: PipingGeometry = FP_NOT_APPLIED
+    kv_bare_valve: float = 0.0
     opening: OpeningCheck = OpeningCheck(False, 0.0, None, None, ())
 
     def __str__(self) -> str:
@@ -80,6 +83,8 @@ class LiquidSizingResult:
         if self.flow_regime.checked and self.flow_regime.correction_needed:
             regime = f" | {self.flow_regime.regime.upper()}, turbulent equations do not apply"
         extra = ''
+        if self.piping.checked and self.piping.fp < 1.0:
+            extra += f' | Fp {self.piping.fp:.3g}'
         if self.velocity.checked:
             extra += f' | {self.velocity.velocity_ms:.2f} m/s'
         for check in (self.velocity, self.opening):
@@ -112,6 +117,7 @@ def liquid_flow_coefficient(
     valve_diameter_mm: float | None = None,
     pipe_diameter_mm: float | None = None,
     rated_kv: float | None = None,
+    downstream_diameter_mm: float | None = None,
     intermittent_service: bool = False,
     units: str | None = None,
     pressure_unit: str | None = None,
@@ -256,7 +262,17 @@ def liquid_flow_coefficient(
             is_choked = True
             dp_effective = dp_choked
 
-    kv = q / math.sqrt(dp_effective / relative_density)
+    kv_bare = q / math.sqrt(dp_effective / relative_density)
+
+    # Reducers cost capacity, so the assembly needs a larger coefficient than
+    # the bare valve would. IEC 60534-2-1 clause 5.
+    piping = piping_geometry_factor(
+        rated_kv=rated_kv,
+        valve_diameter_mm=valve_diameter_mm,
+        upstream_diameter_mm=pipe_diameter_mm,
+        downstream_diameter_mm=downstream_diameter_mm,
+    )
+    kv = kv_bare / piping.fp
 
     fd = get_valve_style(valve_style).fd if valve_style else 0.46
     flow_regime = screen(
@@ -298,6 +314,8 @@ def liquid_flow_coefficient(
         flow_source=flow_source,
         velocity=velocity,
         opening=opening,
+        piping=piping,
+        kv_bare_valve=kv_bare,
     )
 
 

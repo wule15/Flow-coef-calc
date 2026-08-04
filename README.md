@@ -58,6 +58,8 @@ print(result.opening)
 
 **Seven valve styles** with typical FL, xT and Fd. Supplying your own beats the typical value, and the result records which it used.
 
+**Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 6 percent, and without the correction the sizing is optimistic by exactly that much.
+
 **Flow regime screening.** Give it a viscosity and it works out the valve Reynolds number and tells you if the flow left the turbulent range the equations assume.
 
 **Joule-Thomson cooling** estimated on gas, so a 60 bar CO2 letdown reports an outlet around -41 C instead of quietly handing you a valve body that will be brittle.
@@ -92,7 +94,6 @@ That is why xT has no default, and why the result carries `is_choked` instead of
 ## What it does not do
 
 - **The Reynolds number factor FR is not implemented.** Viscous flow is screened and reported, not corrected. A transitional or laminar answer comes back labelled and should not be trusted as it stands.
-- **The piping geometry factor Fp is not implemented.** Valves fitted between reducers will size slightly optimistically.
 - Cavitation is detected at full choking only. Damage can begin before that point and the library will not flag it.
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
 - Material screening is on temperature alone. It excludes grades, it does not select one.
@@ -179,7 +180,7 @@ pytest
 
 ## Tests
 
-81 tests, no network, no files, nothing mocked.
+99 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
@@ -215,7 +216,7 @@ The three I would raise first if you were reviewing this.
 
 **Fluid property data is a small hand-entered table.** Seven fluids, each cited, each with a validity range that is enforced. But a wrong Antoine constant would be invisible until somebody's cavitation prediction was wrong, and only water and ammonia are checked against published vapour pressures.
 
-**The FR and Fp gaps are real, not cosmetic.** Viscous service and reducer-fitted valves are both ordinary situations, and in both the library returns a number it has told you not to fully trust. Reporting the limitation is better than hiding it, and it is not the same as handling it.
+**FR is still not implemented.** Viscous service is screened and labelled but not corrected, so a transitional or laminar answer is a number the library has told you not to trust. That correction is implicit, the Reynolds number depends on the coefficient you are solving for, so it needs iteration. Doing it badly would produce a wrong answer that looks exactly as confident as a right one, which is why it is still outstanding rather than rushed.
 
 ---
 
