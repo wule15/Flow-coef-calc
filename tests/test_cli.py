@@ -77,9 +77,15 @@ class TestItReportsWhatItDidNotCheck:
         assert 'NOT CHECKED' in capsys.readouterr().out
 
     def test_gas_without_xt_says_the_check_was_skipped(self, capsys):
-        main(['gas', '--flow', '500', '--p1', '7', '--p2', '5',
+        main(['gas', '--flow', '500', '--p1', '7', '--p2', '6.7',
               '--basis', 'absolute', '--temp', '20', '--fluid', 'air'])
         assert 'NOT CHECKED' in capsys.readouterr().out
+
+    def test_gas_without_xt_at_high_x_refuses_with_a_reason(self, capsys):
+        code = main(['gas', '--flow', '500', '--p1', '7', '--p2', '5',
+                     '--basis', 'absolute', '--temp', '20', '--fluid', 'air'])
+        assert code == 2
+        assert 'undersizes' in capsys.readouterr().err
 
     def test_a_choked_valve_says_so_in_capitals(self, capsys):
         main(['gas', '--flow', '2000', '--p1', '60', '--p2', '5',

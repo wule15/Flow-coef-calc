@@ -179,12 +179,32 @@ class TestDidNotCheckIsNotTheSameAsClear:
         assert r.fl == 0.93
         assert r.fl_source == 'supplied'
 
-    def test_gas_without_xt_reports_no_check(self):
+    def test_gas_without_xt_reports_no_check_at_low_x(self):
+        """
+        Below x = 0.1 the true expansion factor is within a few percent of 1,
+        so proceeding without xT is defensible. The result still has to say
+        it did not check, and say the Y it used was assumed.
+        """
         r = gas_flow_coefficient(
-            flow_rate=500, inlet_pressure=7.0, outlet_pressure=5.0,
+            flow_rate=500, inlet_pressure=7.0, outlet_pressure=6.7,
             pressure_basis='absolute', temperature=20, fluid='air')
         assert r.choked_check_performed is False
         assert r.xt_source == 'not provided'
+        assert 'assumed' in r.expansion_factor_source
+        assert 'assumed' in str(r)
+
+    def test_gas_without_xt_refuses_once_x_is_large(self):
+        """
+        Y is in the denominator, so Y = 1 gives the smallest coefficient the
+        equation can produce, up to a third below the choked value. It is the
+        most optimistic assumption available, and the failure is an
+        undersized valve. Past x = 0.1 the library refuses rather than
+        returning it.
+        """
+        with pytest.raises(InvalidFluidPropertyError, match='undersizes'):
+            gas_flow_coefficient(
+                flow_rate=500, inlet_pressure=7.0, outlet_pressure=5.0,
+                pressure_basis='absolute', temperature=20, fluid='air')
 
     def test_regime_without_viscosity_reports_no_check(self):
         r = liquid_flow_coefficient(

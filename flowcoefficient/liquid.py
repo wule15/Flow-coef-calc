@@ -30,7 +30,8 @@ from dataclasses import dataclass
 from .checks import (OpeningCheck, VELOCITY_NOT_CHECKED, VelocityCheck,
                      check_opening, check_velocity)
 from .coefficients import kv_to_cv
-from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError
+from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
+                     InvalidPressureError, OutOfRangeError)
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
@@ -69,6 +70,7 @@ class LiquidSizingResult:
     flow_regime: FlowRegime = NOT_CHECKED
     flow_rate_m3h: float = 0.0
     flow_source: str = 'supplied'
+    relative_density_source: str = 'supplied'
     velocity: VelocityCheck = VELOCITY_NOT_CHECKED
     piping: PipingGeometry = FP_NOT_APPLIED
     kv_bare_valve: float = 0.0
@@ -189,11 +191,26 @@ def liquid_flow_coefficient(
     elif temperature_in is not None:
         temperature_k = convert_temperature(temperature_in, resolved['temperature'], 'k')
 
-    if relative_density is None:
-        if fluid_obj is not None and fluid_obj.relative_density_15c is not None:
-            relative_density = fluid_obj.relative_density_15c
-        else:
-            relative_density = 1.0
+    if relative_density is not None:
+        relative_density_source = 'supplied'
+    elif fluid_obj is not None:
+        if fluid_obj.relative_density_15c is None:
+            raise InvalidFluidPropertyError(
+                f'no liquid relative density is held for {fluid_obj.name}, so '
+                f'it cannot be sized as a liquid without one. '
+                f'{fluid_obj.note or ""} Pass relative_density explicitly, at '
+                f'the flowing temperature, or size it with '
+                f'gas_flow_coefficient if it is a gas in this service.'
+            )
+        relative_density = fluid_obj.relative_density_15c
+        relative_density_source = (
+            f'tabulated for {fluid_obj.name} at 15 C. Liquid density falls '
+            f'with temperature and this is not corrected, so supply it '
+            f'explicitly for hot service.'
+        )
+    else:
+        relative_density = 1.0
+        relative_density_source = 'assumed 1.0, no fluid named and none supplied'
     if relative_density <= 0:
         raise InvalidFluidPropertyError(
             f'relative density must be positive, got {relative_density}'
@@ -231,7 +248,10 @@ def liquid_flow_coefficient(
     if pv is None and fluid_obj is not None and temperature_k is not None:
         try:
             pv = fluid_obj.vapour_pressure_bar(temperature_k)
-        except InvalidFluidPropertyError:
+        except (InvalidFluidPropertyError, OutOfRangeError):
+            # Outside the Antoine fit, or no correlation held. Skip the
+            # choked check and say so, rather than refusing an otherwise
+            # ordinary sizing. Water above 100 C hits this.
             pv = None
 
     pc = critical_pressure
@@ -240,6 +260,18 @@ def liquid_flow_coefficient(
 
     fl_value, fl_source = resolve_fl(fl, valve_style)
 
+    # Fp and FLP together. FLP/Fp replaces FL in the choked test below,
+    # because a valve between reducers chokes at a lower pressure drop than
+    # the bare valve does. IEC 60534-2-1 clause 5.
+    piping = piping_geometry_factor(
+        rated_kv=rated_kv,
+        valve_diameter_mm=valve_diameter_mm,
+        upstream_diameter_mm=pipe_diameter_mm,
+        downstream_diameter_mm=downstream_diameter_mm,
+        fl=fl_value,
+    )
+    fl_for_choking = piping.effective_fl if piping.effective_fl is not None else fl_value
+
     # ── Choked check ────────────────────────────────────────────────────────
     dp_actual = p1 - p2
     dp_effective = dp_actual
@@ -247,10 +279,10 @@ def liquid_flow_coefficient(
     check_performed = False
     ff = None
 
-    if fl_value is not None and pv is not None and pc is not None:
+    if fl_for_choking is not None and pv is not None and pc is not None:
         check_performed = True
         ff = ff_critical_pressure_ratio(pv, pc)
-        dp_choked = fl_value ** 2 * (p1 - ff * pv)
+        dp_choked = fl_for_choking ** 2 * (p1 - ff * pv)
         if dp_choked <= 0:
             raise InvalidFluidPropertyError(
                 f'the choked pressure drop works out at {dp_choked:.5g} bar, '
@@ -264,14 +296,6 @@ def liquid_flow_coefficient(
 
     kv_bare = q / math.sqrt(dp_effective / relative_density)
 
-    # Reducers cost capacity, so the assembly needs a larger coefficient than
-    # the bare valve would. IEC 60534-2-1 clause 5.
-    piping = piping_geometry_factor(
-        rated_kv=rated_kv,
-        valve_diameter_mm=valve_diameter_mm,
-        upstream_diameter_mm=pipe_diameter_mm,
-        downstream_diameter_mm=downstream_diameter_mm,
-    )
     kv = kv_bare / piping.fp
 
     fd = get_valve_style(valve_style).fd if valve_style else 0.46
@@ -312,6 +336,7 @@ def liquid_flow_coefficient(
         flow_regime=flow_regime,
         flow_rate_m3h=q,
         flow_source=flow_source,
+        relative_density_source=relative_density_source,
         velocity=velocity,
         opening=opening,
         piping=piping,

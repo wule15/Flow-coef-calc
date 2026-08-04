@@ -88,6 +88,8 @@ class PipingGeometry:
 
     checked: bool
     fp: float
+    flp: float | None
+    effective_fl: float | None
     sum_z: float | None
     valve_diameter_mm: float | None
     upstream_diameter_mm: float | None
@@ -106,7 +108,7 @@ class PipingGeometry:
 
 
 NOT_APPLIED = PipingGeometry(
-    checked=False, fp=1.0, sum_z=None,
+    checked=False, fp=1.0, flp=None, effective_fl=None, sum_z=None,
     valve_diameter_mm=None, upstream_diameter_mm=None,
     downstream_diameter_mm=None, rated_kv=None,
     note=(
@@ -122,6 +124,7 @@ def piping_geometry_factor(
     valve_diameter_mm: float | None,
     upstream_diameter_mm: float | None,
     downstream_diameter_mm: float | None = None,
+    fl: float | None = None,
 ) -> PipingGeometry:
     """
     Fp for a valve between reducers. IEC 60534-2-1 clause 5.
@@ -174,6 +177,24 @@ def piping_geometry_factor(
 
     fp = 1.0 / math.sqrt(1.0 + (sum_z / N2) * (rated_kv / d ** 2) ** 2)
 
+    # FLP, the combined liquid pressure recovery factor for the assembly.
+    # IEC 60534-2-1 clause 5. Only the inlet fitting counts here, because
+    # choking is decided at the vena contracta, which is upstream of the
+    # outlet increaser.
+    #
+    #   FLP = FL / sqrt( 1 + (FL^2 / N2) * (Z1 + ZB1) * (C/d^2)^2 )
+    #
+    # The choked test must then use FLP/Fp in place of FL. FLP/Fp is always
+    # below FL, so a valve between reducers chokes at a LOWER pressure drop
+    # than the bare valve does. Testing with bare FL on a reduced bore
+    # installation reports the valve clear when it is already choked.
+    flp = None
+    effective_fl = None
+    if fl is not None:
+        inlet_terms = z1 + zb1
+        flp = fl / math.sqrt(1.0 + (fl ** 2 / N2) * inlet_terms * (rated_kv / d ** 2) ** 2)
+        effective_fl = flp / fp
+
     if sum_z == 0.0:
         note = 'Valve is line size, so there are no reducers and Fp is 1.'
     else:
@@ -182,10 +203,18 @@ def piping_geometry_factor(
             f'capacity. The required coefficient is divided by Fp, so the '
             f'valve has to be correspondingly larger.'
         )
+        if effective_fl is not None:
+            note += (
+                f' The choked flow test uses FLP/Fp of {effective_fl:.4g} '
+                f'rather than the bare FL of {fl:.4g}, so choking begins at a '
+                f'lower pressure drop than it would without the reducers.'
+            )
 
     return PipingGeometry(
         checked=True,
         fp=fp,
+        flp=flp,
+        effective_fl=effective_fl,
         sum_z=sum_z,
         valve_diameter_mm=d,
         upstream_diameter_mm=d1,

@@ -110,6 +110,12 @@ GAMMA_AIR = 1.40
 # The limiting expansion factor at and beyond choked flow.
 Y_CHOKED = 2.0 / 3.0
 
+# Above this pressure differential ratio, assuming Y = 1 without an xT is
+# not defensible. At x = 0.1 the true Y for a globe is about 0.96, so the
+# assumption costs about 4 percent. At x = 0.5 it costs nearly 30 percent,
+# in the direction that undersizes the valve.
+Y_ASSUMPTION_LIMIT = 0.1
+
 
 @dataclass(frozen=True)
 class GasSizingResult:
@@ -139,6 +145,7 @@ class GasSizingResult:
     compressibility: float
     xt: float | None = None
     xt_source: str = 'not provided'
+    expansion_factor_source: str = 'from xT'
     fluid: str | None = None
     joule_thomson: JouleThomsonEstimate = NOT_ESTIMATED
     materials: MaterialGuidance = NOT_SCREENED
@@ -154,7 +161,10 @@ class GasSizingResult:
         return (
             f"Kv {self.kv:.4g} (Cv {self.cv:.4g}) | "
             f"inputs {self.pressure_basis}{fluid} | "
-            f"x {self.pressure_drop_ratio:.3f}, Y {self.expansion_factor:.3f} | {state}{jt}"
+            f"x {self.pressure_drop_ratio:.3f}, "
+            f"Y {self.expansion_factor:.3f}"
+            f"{' assumed' if 'assumed' in self.expansion_factor_source else ''}"
+            f" | {state}{jt}"
         )
 
 
@@ -260,6 +270,7 @@ def gas_flow_coefficient(
     limiting_ratio = None
     x_effective = x
 
+    expansion_source = 'from xT'
     if xt_value is not None:
         check_performed = True
         limiting_ratio = fg * xt_value
@@ -267,13 +278,27 @@ def gas_flow_coefficient(
             is_choked = True
             x_effective = limiting_ratio
         y = 1.0 - x_effective / (3.0 * fg * xt_value)
+    elif x > Y_ASSUMPTION_LIMIT:
+        # Y sits in the denominator, so Y = 1 produces the SMALLEST
+        # coefficient the equation can give, up to a third below the choked
+        # value of 2/3. It is the most optimistic assumption available, not
+        # the least wrong one, and the failure it causes is an undersized
+        # valve. Below x = 0.1 the true Y is within about 4 percent of 1 and
+        # assuming it is defensible. Above, it is not, so this refuses.
+        raise InvalidFluidPropertyError(
+            f'the pressure differential ratio x is {x:.3g}, above '
+            f'{Y_ASSUMPTION_LIMIT}, and no xT was supplied. Without xT the '
+            f'expansion factor cannot be evaluated, and assuming Y = 1 would '
+            f'return a coefficient up to a third too small, which undersizes '
+            f'the valve. Pass xt from the valve data sheet, or valve_style '
+            f'for a typical figure.'
+        )
     else:
-        # No xT, so the expansion factor cannot be evaluated from the
-        # standard's expression. Y = 1 is the incompressible limit and is
-        # the least wrong assumption available, but the result records that
-        # no choked check was performed so the number is not mistaken for a
-        # verified one.
         y = 1.0
+        expansion_source = (
+            f'assumed 1.0, no xT supplied. Defensible only because x is '
+            f'{x:.3g}, below {Y_ASSUMPTION_LIMIT}.'
+        )
 
     kv = q / (N9 * p1 * y * math.sqrt(x_effective / (relative_density * temperature_k * compressibility)))
 
@@ -284,10 +309,17 @@ def gas_flow_coefficient(
     )
 
     inlet_c = convert_temperature(temperature, resolved['temperature'], 'c')
-    materials = screen_materials(
-        minimum_c=jt.outlet_temperature_c if jt.estimated else inlet_c,
-        maximum_c=inlet_c,
-    )
+    if jt.estimated:
+        materials = screen_materials(
+            minimum_c=jt.outlet_temperature_c,
+            maximum_c=inlet_c,
+        )
+    else:
+        # Without a Joule-Thomson estimate the coldest metal temperature is
+        # unknown, and screening on the inlet alone would report a carbon
+        # steel clearance the expansion may well have destroyed. A 55 bar
+        # letdown can take the body 20 to 60 degrees below its inlet.
+        materials = NOT_SCREENED
 
     return GasSizingResult(
         kv=kv,
@@ -308,6 +340,7 @@ def gas_flow_coefficient(
         compressibility=compressibility,
         xt=xt_value,
         xt_source=xt_source,
+        expansion_factor_source=expansion_source,
         fluid=fluid_obj.name if fluid_obj else None,
         joule_thomson=jt,
         materials=materials,
