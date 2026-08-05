@@ -35,7 +35,8 @@ from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
-from .travel import NOT_LOCATED, OperatingPoint, locate
+from .travel import (CONVERGENCE_TOLERANCE, MAX_PASSES, NOT_LOCATED,
+                     OperatingPoint, locate)
 from .thermal import flow_from_thermal_duty
 from .units import (STANDARD_ATMOSPHERE_BAR, convert_flow, convert_temperature,
                     resolve_units, to_absolute_bar,
@@ -310,18 +311,22 @@ def liquid_flow_coefficient(
 
     kv_bare = q / math.sqrt(dp_effective / relative_density)
 
-    # Second pass on FL, for the same reason as the gas side: it is published
-    # against Cv/d-squared, so it depends on where this duty sits on the valve.
+    # FL is published against Cv/d-squared, so it depends on where this duty
+    # sits on the valve, which depends on the coefficient, which depends on
+    # FL through the choked test. Iterate, for the same reason and with the
+    # same history as the gas side.
     operating_point = NOT_LOCATED
-    if valve_style is not None and fl is None:
-        operating_point = locate(valve_style, kv_bare, rated_kv, valve_diameter_mm)
-        if operating_point.located:
-            fl_value = operating_point.fl
-            fl_source = (
-                f'read off the published curve at '
-                f'{operating_point.capacity_fraction * 100:.0f} percent of rated '
-                f'capacity, against {operating_point.fl_wide_open:.3g} wide open'
-            )
+    passes = 0
+    converged = True
+    if valve_style is not None and fl is None and rated_kv and valve_diameter_mm:
+        previous = kv_bare
+        for passes in range(1, MAX_PASSES + 1):
+            point = locate(valve_style, previous / piping.fp, rated_kv, valve_diameter_mm)
+            if not point.located:
+                operating_point = point
+                break
+            operating_point = point
+            fl_value = point.fl
             piping = piping_geometry_factor(
                 rated_kv=rated_kv,
                 valve_diameter_mm=valve_diameter_mm,
@@ -338,7 +343,29 @@ def liquid_flow_coefficient(
                 if dp_choked > 0:
                     is_choked = dp_actual >= dp_choked
                     dp_effective = dp_choked if is_choked else dp_actual
-                    kv_bare = q / math.sqrt(dp_effective / relative_density)
+            kv_bare = q / math.sqrt(dp_effective / relative_density)
+            if abs(kv_bare - previous) <= CONVERGENCE_TOLERANCE * max(kv_bare, 1e-12):
+                break
+            previous = kv_bare
+        else:
+            converged = False
+
+        if operating_point.located:
+            # Re-locate on the settled coefficient, so the reported operating
+            # point describes the answer rather than an estimate.
+            operating_point = locate(
+                valve_style, kv_bare / piping.fp, rated_kv, valve_diameter_mm)
+            fl_value = operating_point.fl
+            settled = 'converged' if converged else (
+                f'DID NOT CONVERGE in {MAX_PASSES} passes, treat with caution')
+            fl_source = (
+                f'read off the published curve at '
+                f'{operating_point.capacity_fraction * 100:.0f} percent of rated '
+                f'capacity, against {operating_point.fl_wide_open:.3g} wide open. '
+                f'{settled} in {passes} passes'
+            )
+            if operating_point.substituted_from:
+                fl_source += f'. Curve measured on {operating_point.substituted_from}'
 
     kv = kv_bare / piping.fp
 

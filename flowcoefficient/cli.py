@@ -77,6 +77,10 @@ def _report_liquid(result) -> None:
     else:
         print(_line('choked flow', 'NOT CHECKED, no FL or vapour pressure given'))
 
+    if result.piping.checked:
+        print(_line('Fp', str(result.piping)))
+    if result.operating_point.located:
+        print(_line('operating point', str(result.operating_point)))
     print(_line('flow regime', str(result.flow_regime)))
     if result.velocity.checked:
         print(_line('line velocity', str(result.velocity)))
@@ -108,6 +112,14 @@ def _report_gas(result) -> None:
     else:
         print(_line('choked flow', 'NOT CHECKED, no xT given'))
 
+    if result.piping.checked:
+        print(_line('Fp', str(result.piping)))
+    if result.operating_point.located:
+        print(_line('operating point', str(result.operating_point)))
+    if result.velocity.checked:
+        print(_line('outlet velocity', str(result.velocity)))
+    if result.opening.checked:
+        print(_line('valve opening', str(result.opening)))
     if result.joule_thomson.estimated:
         print(_line('Joule-Thomson', str(result.joule_thomson)))
     if result.materials.checked:
@@ -145,6 +157,13 @@ def _add_shared(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--fluid', help=f'one of: {", ".join(sorted(FLUIDS))}')
     parser.add_argument('--style', dest='valve_style',
                         help=f'one of: {", ".join(sorted(VALVE_STYLES))}')
+    parser.add_argument('--bore', dest='valve_diameter_mm', type=float,
+                        help='valve bore in mm. With --rated-kv this places '
+                             'the duty on the published FL and xT curve')
+    parser.add_argument('--pipe', dest='pipe_diameter_mm', type=float,
+                        help='line bore in mm, for Fp and the velocity check')
+    parser.add_argument('--rated-kv', dest='rated_kv', type=float,
+                        help="candidate valve's rated Kv, from the catalogue")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -166,9 +185,6 @@ def build_parser() -> argparse.ArgumentParser:
     liq.add_argument('--sg', dest='relative_density', type=float, help='relative density')
     liq.add_argument('--fl', type=float, help='liquid pressure recovery factor')
     liq.add_argument('--viscosity', type=float, help='kinematic viscosity in cSt')
-    liq.add_argument('--pipe', dest='pipe_diameter_mm', type=float, help='pipe bore in mm')
-    liq.add_argument('--rated-kv', dest='rated_kv', type=float,
-                     help="candidate valve's rated Kv, for the oversizing check")
 
     gas = sub.add_parser('gas', help='size for a gas or vapour')
     _add_shared(gas)
@@ -231,8 +247,9 @@ def main(argv: list[str] | None = None) -> int:
                 relative_density=args.relative_density, fluid=args.fluid,
                 temperature=args.temp, fl=args.fl, valve_style=args.valve_style,
                 kinematic_viscosity=args.viscosity,
-                pipe_diameter_mm=args.pipe_diameter_mm, rated_kv=args.rated_kv,
-                units=args.units,
+                pipe_diameter_mm=args.pipe_diameter_mm,
+                valve_diameter_mm=args.valve_diameter_mm,
+                rated_kv=args.rated_kv, units=args.units,
             )
             _report_liquid(result)
             return 0
@@ -243,7 +260,10 @@ def main(argv: list[str] | None = None) -> int:
             pressure_basis=args.basis, temperature=args.temp,
             relative_density=args.relative_density, fluid=args.fluid,
             gamma=args.gamma, xt=args.xt, valve_style=args.valve_style,
-            compressibility=args.compressibility, units=args.units,
+            compressibility=args.compressibility,
+            pipe_diameter_mm=args.pipe_diameter_mm,
+            valve_diameter_mm=args.valve_diameter_mm,
+            rated_kv=args.rated_kv, units=args.units,
         )
         _report_gas(result)
         return 0

@@ -51,7 +51,7 @@ neither and the library says it did not perform the check.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .errors import OutOfRangeError
 
@@ -86,36 +86,66 @@ class ValveStyle:
 # Every one of these varies with size, trim and travel, which is why the
 # result records them as typical rather than measured.
 VALVE_STYLES: dict[str, ValveStyle] = {
-    'globe': ValveStyle('globe', fl=0.90, xt=0.75, fd=0.46,
-                        fl_range=(0.83, 0.93), xt_range=(0.69, 0.75),
-                        note='single seat, parabolic plug, flow to open'),
+    'globe': ValveStyle('globe', fl=0.90, xt=0.69, fd=0.46,
+                        note='single seat, parabolic plug, flow to open. xT '
+                             'was 0.75, above the 0.72 maximum of the curve '
+                             'this style uses'),
     'globe cage': ValveStyle('globe cage', fl=0.95, xt=0.75, fd=0.41,
-                             fl_range=(0.95, 0.97), xt_range=(0.69, 0.75),
                              note='cage guided, balanced plug. Fd was 0.98, '
                                   'which is the segmented ball figure and '
                                   'looked copied; a multi-port cage is '
                                   'nearer 0.41'),
-    'angle': ValveStyle('angle', fl=0.85, xt=0.72, fd=1.00,
-                        fl_range=(0.80, 0.90), xt_range=(0.65, 0.75),
-                        note='flow to close. Fd 1.00, a single flow passage'),
+    'angle': ValveStyle('angle', fl=0.85, xt=0.55, fd=1.00,
+                        note='flow to close. Fd 1.00, a single flow passage. '
+                             'xT was 0.72, above the 0.62 maximum of the '
+                             'curve this style actually uses'),
     'butterfly': ValveStyle('butterfly', fl=0.70, xt=0.35, fd=0.57,
-                            fl_range=(0.40, 0.87), xt_range=(0.15, 0.68),
                             note='soft seated, mid travel. A concentric disc '
                                  'runs lower on xT, 0.28 to 0.46'),
     'ball': ValveStyle('ball', fl=0.60, xt=0.20, fd=1.00,
-                       fl_range=(0.28, 0.91), xt_range=(0.05, 0.82),
                        note='full bore trunnion mounted, around 80 percent '
                             'open. xT spans a factor of 16 across the travel, '
                             'so this figure is a placeholder more than most'),
     'segmented ball': ValveStyle('segmented ball', fl=0.66, xt=0.25, fd=0.98,
-                                 fl_range=(0.42, 0.94), xt_range=(0.16, 0.64),
                                  note='V port, mid to open travel'),
+    'butterfly concentric': ValveStyle('butterfly concentric', fl=0.72, xt=0.38,
+                                      fd=0.57,
+                                      note='concentric disc, mid travel. '
+                                           'Flatter curve than a soft seated '
+                                           'disc, and a lower xT throughout'),
+    'triple eccentric disc': ValveStyle('triple eccentric disc', fl=0.75,
+                                        xt=0.42, fd=0.57,
+                                        note='high performance triple '
+                                             'eccentric, mid travel'),
     'eccentric plug': ValveStyle('eccentric plug', fl=0.85, xt=0.55, fd=0.42,
-                                 fl_range=(0.76, 0.91), xt_range=(0.40, 0.62),
                                  note='rotary, flow to open. xT was 0.68, '
                                       'above the published span, now mid '
                                       'range'),
 }
+
+
+def _spans_from_curves() -> None:
+    """
+    Replace each style's declared span with the span of its own travel curve.
+
+    Hand-written spans drifted from the curves they were meant to describe:
+    globe declared xT 0.69 to 0.75 against a curve dipping to 0.61, and angle
+    declared 0.65 to 0.75 against a curve spanning 0.40 to 0.62, which do not
+    even overlap. Deriving them removes the whole class of mismatch.
+    """
+    from .travel import CURVES
+    for name, style in list(VALVE_STYLES.items()):
+        curve = CURVES.get(name)
+        if curve is None:
+            continue
+        VALVE_STYLES[name] = replace(
+            style,
+            fl_range=(min(curve.fl), max(curve.fl)),
+            xt_range=(min(curve.xt), max(curve.xt)),
+        )
+
+
+_spans_from_curves()
 
 
 def _check_fraction(name: str, value: float) -> None:

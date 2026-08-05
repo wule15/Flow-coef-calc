@@ -86,7 +86,8 @@ from .units import (
 )
 from .materials import NOT_SCREENED, MaterialGuidance, screen_materials
 from .thermal import JouleThomsonEstimate, NOT_ESTIMATED, estimate_joule_thomson
-from .travel import NOT_LOCATED, OperatingPoint, locate
+from .travel import (CONVERGENCE_TOLERANCE, MAX_PASSES, NOT_LOCATED,
+                     OperatingPoint, locate)
 from .valves import resolve_xt
 
 # ── N9, derived rather than quoted. See the module docstring. ───────────────
@@ -329,37 +330,74 @@ def gas_flow_coefficient(
     kv_bare = q / (N9 * p1 * y * math.sqrt(
         x_effective / (relative_density * temperature_k * compressibility)))
 
-    # Second pass. FL and xT are published against Cv/d-squared, so the right
-    # value depends on where this duty sits on the valve, which depends on the
-    # coefficient just computed. IEC resolves the circularity by iterating
-    # from an estimate; one refinement is enough because the curve is shallow
-    # over the range a valve is realistically operated in.
-    operating_point = NOT_LOCATED
-    if valve_style is not None and xt is None:
-        operating_point = locate(valve_style, kv_bare, rated_kv, valve_diameter_mm)
-        if operating_point.located:
-            xt_value = operating_point.xt
-            xt_source = (
-                f'read off the published curve at {operating_point.capacity_fraction * 100:.0f} '
-                f'percent of rated capacity, against {operating_point.xt_wide_open:.3g} wide open'
-            )
-            limiting_ratio = fg * xt_value
-            x_effective = min(x, limiting_ratio)
-            is_choked = x >= limiting_ratio
-            y = 1.0 - x_effective / (3.0 * fg * xt_value)
-            expansion_source = 'from xT at the operating point'
-            kv_bare = q / (N9 * p1 * y * math.sqrt(
-                x_effective / (relative_density * temperature_k * compressibility)))
-
-    # Fp applies to gas exactly as it does to liquid. IEC 60534-2-1 clause 5
-    # is not liquid specific; the reducers restrict the assembly whatever is
-    # flowing through it.
+    # Fp applies to gas exactly as it does to liquid. Computed before the
+    # refinement below, which needs it to place the duty on the curve.
     piping = piping_geometry_factor(
         rated_kv=rated_kv,
         valve_diameter_mm=valve_diameter_mm,
         upstream_diameter_mm=pipe_diameter_mm,
         downstream_diameter_mm=downstream_diameter_mm,
     )
+
+    # xT is published against Cv/d-squared, so the right value depends on
+    # where this duty sits on the valve, which depends on the coefficient,
+    # which depends on xT. IEC resolves the circularity by iterating and so
+    # do we.
+    #
+    # An earlier version did exactly two passes and claimed that was enough.
+    # It was not: swept across realistic duties, two passes left 13 percent
+    # of cases more than 1 percent from the converged answer and the worst
+    # was 39 percent out. It now iterates to a tolerance and reports whether
+    # it got there.
+    #
+    # The lookup uses the Fp-corrected coefficient, because that is what the
+    # valve actually has to deliver and therefore what sets its travel.
+    # IEC 60534-2-1 clause 5: C = Q / (N1 Fp sqrt(dP/rho)).
+    operating_point = NOT_LOCATED
+    passes = 0
+    converged = True
+    if valve_style is not None and xt is None and rated_kv and valve_diameter_mm:
+        previous = kv_bare
+        for passes in range(1, MAX_PASSES + 1):
+            point = locate(valve_style, previous / piping.fp, rated_kv, valve_diameter_mm)
+            if not point.located:
+                operating_point = point
+                break
+            operating_point = point
+            xt_value = point.xt
+            limiting_ratio = fg * xt_value
+            x_effective = min(x, limiting_ratio)
+            is_choked = x >= limiting_ratio
+            y = 1.0 - x_effective / (3.0 * fg * xt_value)
+            kv_bare = q / (N9 * p1 * y * math.sqrt(
+                x_effective / (relative_density * temperature_k * compressibility)))
+            if abs(kv_bare - previous) <= CONVERGENCE_TOLERANCE * max(kv_bare, 1e-12):
+                break
+            previous = kv_bare
+        else:
+            converged = False
+
+        if operating_point.located:
+            # Re-locate on the settled coefficient so the reported operating
+            # point describes the answer that shipped, not an intermediate
+            # estimate. Without this the result contradicted itself: the
+            # operating point said 34 percent of rated while the opening
+            # check on the same object said 18 percent.
+            operating_point = locate(
+                valve_style, kv_bare / piping.fp, rated_kv, valve_diameter_mm)
+            xt_value = operating_point.xt
+            settled = 'converged' if converged else (
+                f'DID NOT CONVERGE in {MAX_PASSES} passes, treat with caution')
+            xt_source = (
+                f'read off the published curve at '
+                f'{operating_point.capacity_fraction * 100:.0f} percent of rated '
+                f'capacity, against {operating_point.xt_wide_open:.3g} wide open. '
+                f'{settled} in {passes} passes'
+            )
+            if operating_point.substituted_from:
+                xt_source += f'. Curve measured on {operating_point.substituted_from}'
+            expansion_source = 'from xT at the operating point'
+
     kv = kv_bare / piping.fp
 
     # Velocity, evaluated at the OUTLET. Gas expands through the valve, so

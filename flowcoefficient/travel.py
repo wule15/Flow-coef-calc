@@ -35,10 +35,19 @@ curve and the result says where it landed and what that did to FL and xT.
 The circularity, and how it is handled
 --------------------------------------
 The required coefficient depends on FL and xT, and FL and xT depend on the
-coefficient. IEC resolves this by iterating from an estimate. This module
-does two passes, which is enough: the curve is shallow over the range a valve
-is realistically operated in, and the second pass moves the answer by well
-under a percent in every case tested.
+coefficient. IEC resolves this by iterating from an estimate, and so does
+this module.
+
+An earlier version did two passes and claimed that moved the answer by well
+under a percent. That claim was wrong. Sweeping realistic duties across five
+valve styles, three bores, three rated coefficients and four pressure drop
+ratios, two passes left 13 percent of cases more than 1 percent from the
+converged answer, and the worst was 39 percent out. It converges, it does not
+oscillate, but two passes does not reach it.
+
+It now iterates to a relative tolerance with an iteration cap, and reports
+how many passes it took and whether it converged. A duty that does not settle
+says so rather than returning the last guess.
 
 Source
 ------
@@ -64,6 +73,12 @@ class TravelCurve:
     fl: tuple[float, ...]
     xt: tuple[float, ...]
     source: str
+    substituted_from: str = ''
+    """
+    Set when this curve belongs to a different valve geometry than the style
+    it is registered under. The substitution then travels into fl_source and
+    xt_source, so a caller reading only the result still learns about it.
+    """
 
     def at(self, cv_over_d2: float) -> tuple[float, float]:
         """
@@ -107,22 +122,28 @@ CURVES: dict[str, TravelCurve] = {
     'globe': TravelCurve(
         cv_over_d2=(0.22, 0.70, 1.65, 2.81, 4.06, 5.34, 6.43, 6.95, 7.80, 12.0),
         fl=(0.93, 0.93, 0.92, 0.86, 0.85, 0.84, 0.83, 0.83, 0.83, 0.83),
+        # This xT array is genuinely non-monotonic: it dips to 0.61 and
+        # climbs back. Verified against the catalogue page twice, and the
+        # equal percentage trim on the facing page prints the identical
+        # numbers. It is measured behaviour, not a transcription error.
         xt=(0.69, 0.69, 0.72, 0.63, 0.61, 0.62, 0.65, 0.69, 0.71, 0.70),
         source=f'{_VALMET}, rotary globe with linear trim',
     ),
     'globe cage': TravelCurve(
         cv_over_d2=(0.18, 0.36, 0.55, 0.98, 1.68, 2.35, 2.98, 3.81, 4.66, 8.89),
         fl=(0.97, 0.97, 0.97, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95),
-        xt=(0.75, 0.75, 0.75, 0.74, 0.73, 0.72, 0.72, 0.71, 0.71, 0.70),
-        source=f'{_VALMET}, balanced trim. xT interpolated from the linear '
-               f'trim curve, the catalogue tabulates FL only for this trim',
+        xt=(0.75, 0.75, 0.75, 0.75, 0.73, 0.71, 0.74, 0.74, 0.75, 0.75),
+        source=f'{_VALMET}, rotary globe with balanced trim',
     ),
     'angle': TravelCurve(
         cv_over_d2=(1.12, 2.26, 3.29, 4.53, 5.81, 7.38, 9.44, 11.44, 13.44, 15.0),
         fl=(0.91, 0.89, 0.87, 0.85, 0.83, 0.82, 0.80, 0.78, 0.77, 0.76),
         xt=(0.62, 0.62, 0.62, 0.62, 0.61, 0.60, 0.56, 0.52, 0.45, 0.40),
-        source=f'{_VALMET}, eccentric rotary plug flow to open, the closest '
-               f'published geometry',
+        source=f'{_VALMET}, eccentric rotary plug flow to open',
+        substituted_from='an eccentric rotary plug, the closest published '
+                         'geometry. An angle globe body does not lose '
+                         'recovery as it opens the way a rotary valve does, '
+                         'so treat this as indicative only',
     ),
     'butterfly': TravelCurve(
         cv_over_d2=(0.91, 2.43, 4.38, 6.60, 9.42, 13.63, 20.23, 29.60, 41.36, 47.01),
@@ -168,6 +189,12 @@ CURVES: dict[str, TravelCurve] = {
 GOOD_OPENING_LOW = 0.20
 GOOD_OPENING_HIGH = 0.80
 
+# Relative change in the coefficient below which the fixed point is settled.
+# Ten to the minus four is far tighter than any valve data justifies, and it
+# costs nothing: convergence is geometric and typically takes four passes.
+CONVERGENCE_TOLERANCE = 1.0e-4
+MAX_PASSES = 25
+
 
 @dataclass(frozen=True)
 class OperatingPoint:
@@ -181,6 +208,7 @@ class OperatingPoint:
     capacity_fraction: float | None
     cv_over_d2: float | None
     note: str
+    substituted_from: str = ''
 
     def __str__(self) -> str:
         if not self.located:
@@ -200,6 +228,17 @@ NOT_LOCATED = OperatingPoint(
         'open values. That is the rated condition and the conservative choice '
         'for a rotary valve, whose xT is lowest fully open. Supply rated_kv '
         'and valve_diameter_mm to locate the duty on the published curve.'
+    ),
+)
+
+
+NO_CURVE = OperatingPoint(
+    located=False, fl=None, xt=None, fl_wide_open=None, xt_wide_open=None,
+    capacity_fraction=None, cv_over_d2=None,
+    note=(
+        'No published travel curve is held for this valve style, so FL and xT '
+        'are the placeholder values. The bore and rated coefficient supplied '
+        'were not used.'
     ),
 )
 
@@ -224,11 +263,17 @@ def locate(
     >>> round(p.xt, 3), round(p.xt_wide_open, 3)
     (0.525, 0.185)
     """
-    curve = CURVES.get(style_name)
+    # Normalise exactly as get_valve_style does. Without this a caller who
+    # writes 'Ball' passes style validation, misses the curve, silently falls
+    # back to the placeholder, and gets an answer 85 percent different with a
+    # note claiming no bore was supplied.
+    curve = CURVES.get(style_name.strip().lower()) if style_name else None
     if curve is None:
         return NOT_LOCATED
     if rated_kv is None or valve_diameter_mm is None:
         return NOT_LOCATED
+    if curve is None:
+        return NO_CURVE
     if rated_kv <= 0 or valve_diameter_mm <= 0 or required_kv <= 0:
         return NOT_LOCATED
 
@@ -242,6 +287,8 @@ def locate(
     fraction = required_kv / rated_kv
 
     parts = [f'Located on the {curve.source} curve at Cv/d2 {cv_over_d2:.3g}.']
+    if curve.substituted_from:
+        parts.append(f'That curve is measured on {curve.substituted_from}.')
     if fraction < GOOD_OPENING_LOW:
         parts.append(
             f'The duty is {fraction * 100:.0f} percent of rated capacity, below '
@@ -272,6 +319,7 @@ def locate(
 
     return OperatingPoint(
         located=True,
+        substituted_from=curve.substituted_from,
         fl=fl,
         xt=xt,
         fl_wide_open=fl_open,

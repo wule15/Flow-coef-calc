@@ -214,7 +214,7 @@ pytest
 
 ## Tests
 
-175 tests, no network, no files, nothing mocked.
+231 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
