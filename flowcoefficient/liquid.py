@@ -35,6 +35,7 @@ from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
+from .travel import NOT_LOCATED, OperatingPoint, locate
 from .thermal import flow_from_thermal_duty
 from .units import (STANDARD_ATMOSPHERE_BAR, convert_flow, convert_temperature,
                     resolve_units, to_absolute_bar,
@@ -71,6 +72,7 @@ class LiquidSizingResult:
     flow_rate_m3h: float = 0.0
     flow_source: str = 'supplied'
     relative_density_source: str = 'supplied'
+    operating_point: OperatingPoint = NOT_LOCATED
     velocity: VelocityCheck = VELOCITY_NOT_CHECKED
     piping: PipingGeometry = FP_NOT_APPLIED
     kv_bare_valve: float = 0.0
@@ -308,6 +310,36 @@ def liquid_flow_coefficient(
 
     kv_bare = q / math.sqrt(dp_effective / relative_density)
 
+    # Second pass on FL, for the same reason as the gas side: it is published
+    # against Cv/d-squared, so it depends on where this duty sits on the valve.
+    operating_point = NOT_LOCATED
+    if valve_style is not None and fl is None:
+        operating_point = locate(valve_style, kv_bare, rated_kv, valve_diameter_mm)
+        if operating_point.located:
+            fl_value = operating_point.fl
+            fl_source = (
+                f'read off the published curve at '
+                f'{operating_point.capacity_fraction * 100:.0f} percent of rated '
+                f'capacity, against {operating_point.fl_wide_open:.3g} wide open'
+            )
+            piping = piping_geometry_factor(
+                rated_kv=rated_kv,
+                valve_diameter_mm=valve_diameter_mm,
+                upstream_diameter_mm=pipe_diameter_mm,
+                downstream_diameter_mm=downstream_diameter_mm,
+                fl=fl_value,
+            )
+            fl_for_choking = (piping.effective_fl
+                              if piping.effective_fl is not None else fl_value)
+            if fl_for_choking is not None and pv is not None and pc is not None:
+                check_performed = True
+                ff = ff_critical_pressure_ratio(pv, pc)
+                dp_choked = fl_for_choking ** 2 * (p1 - ff * pv)
+                if dp_choked > 0:
+                    is_choked = dp_actual >= dp_choked
+                    dp_effective = dp_choked if is_choked else dp_actual
+                    kv_bare = q / math.sqrt(dp_effective / relative_density)
+
     kv = kv_bare / piping.fp
 
     fd = get_valve_style(valve_style).fd if valve_style else 0.46
@@ -349,6 +381,7 @@ def liquid_flow_coefficient(
         flow_rate_m3h=q,
         flow_source=flow_source,
         relative_density_source=relative_density_source,
+        operating_point=operating_point,
         velocity=velocity,
         opening=opening,
         piping=piping,

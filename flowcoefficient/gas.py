@@ -86,6 +86,7 @@ from .units import (
 )
 from .materials import NOT_SCREENED, MaterialGuidance, screen_materials
 from .thermal import JouleThomsonEstimate, NOT_ESTIMATED, estimate_joule_thomson
+from .travel import NOT_LOCATED, OperatingPoint, locate
 from .valves import resolve_xt
 
 # ── N9, derived rather than quoted. See the module docstring. ───────────────
@@ -149,6 +150,7 @@ class GasSizingResult:
     xt: float | None = None
     xt_source: str = 'not provided'
     expansion_factor_source: str = 'from xT'
+    operating_point: OperatingPoint = NOT_LOCATED
     fluid: str | None = None
     joule_thomson: JouleThomsonEstimate = NOT_ESTIMATED
     materials: MaterialGuidance = NOT_SCREENED
@@ -322,7 +324,32 @@ def gas_flow_coefficient(
             f'{x:.3g}, below {Y_ASSUMPTION_LIMIT}.'
         )
 
-    kv_bare = q / (N9 * p1 * y * math.sqrt(x_effective / (relative_density * temperature_k * compressibility)))
+
+
+    kv_bare = q / (N9 * p1 * y * math.sqrt(
+        x_effective / (relative_density * temperature_k * compressibility)))
+
+    # Second pass. FL and xT are published against Cv/d-squared, so the right
+    # value depends on where this duty sits on the valve, which depends on the
+    # coefficient just computed. IEC resolves the circularity by iterating
+    # from an estimate; one refinement is enough because the curve is shallow
+    # over the range a valve is realistically operated in.
+    operating_point = NOT_LOCATED
+    if valve_style is not None and xt is None:
+        operating_point = locate(valve_style, kv_bare, rated_kv, valve_diameter_mm)
+        if operating_point.located:
+            xt_value = operating_point.xt
+            xt_source = (
+                f'read off the published curve at {operating_point.capacity_fraction * 100:.0f} '
+                f'percent of rated capacity, against {operating_point.xt_wide_open:.3g} wide open'
+            )
+            limiting_ratio = fg * xt_value
+            x_effective = min(x, limiting_ratio)
+            is_choked = x >= limiting_ratio
+            y = 1.0 - x_effective / (3.0 * fg * xt_value)
+            expansion_source = 'from xT at the operating point'
+            kv_bare = q / (N9 * p1 * y * math.sqrt(
+                x_effective / (relative_density * temperature_k * compressibility)))
 
     # Fp applies to gas exactly as it does to liquid. IEC 60534-2-1 clause 5
     # is not liquid specific; the reducers restrict the assembly whatever is
@@ -396,6 +423,7 @@ def gas_flow_coefficient(
         expansion_factor_source=expansion_source,
         fluid=fluid_obj.name if fluid_obj else None,
         joule_thomson=jt_estimate,
+        operating_point=operating_point,
         materials=materials,
         piping=piping,
         kv_bare_valve=kv_bare,
