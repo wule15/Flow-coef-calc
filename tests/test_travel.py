@@ -85,14 +85,32 @@ class TestInterpolation:
 
 
 class TestLocatingTheDuty:
-    def test_the_abscissa_is_cv_over_bore_in_inches_squared(self):
+    def test_the_abscissa_matches_the_catalogue_anchor(self):
         """
-        Confirmed against the catalogue: a DN25 valve of rated Cv 12
-        tabulates a maximum Cv/d-squared of 12.0.
+        The outside anchor, not a restatement of the code.
+
+        The catalogue's DN25 rotary globe has a full open Cv of 12 and its
+        Cv/d-squared column ends at 12.0. A DN25 valve is one inch nominal,
+        so the abscissa can only be Cv over the bore in INCHES squared. If it
+        were millimetres the figure would be 0.0186; if the bore were the real
+        25 mm rather than one inch it would be 12.39.
+
+        This test states the catalogue fact and checks the code reproduces it.
+        It does not recompute the code's own expression, which was the flaw in
+        the version it replaces: that could not fail for any units error.
         """
-        p = locate('ball', 100.0, 400.0, 50.0)
-        expected = (100.0 * 1.156) / ((50.0 / MM_PER_INCH) ** 2)
-        assert p.cv_over_d2 == pytest.approx(expected, rel=1e-9)
+        one_inch_mm = 25.4
+        rated_cv = 12.0
+        rated_kv = rated_cv / 1.156
+        p = locate('globe', rated_kv, rated_kv, one_inch_mm)
+        assert p.cv_over_d2 == pytest.approx(12.0, rel=1e-3)
+
+    def test_millimetres_would_give_a_different_answer(self):
+        """Proves the previous assertion discriminates."""
+        one_inch_mm = 25.4
+        p = locate('globe', 12.0 / 1.156, 12.0 / 1.156, one_inch_mm)
+        as_mm = (12.0) / (one_inch_mm ** 2)
+        assert p.cv_over_d2 != pytest.approx(as_mm, rel=0.1)
 
     def test_wide_open_means_this_valve_not_the_end_of_the_curve(self):
         """

@@ -1,4 +1,27 @@
-# Formulas for verification
+# Formulas, the pre-implementation record
+
+**Status: historical. This is the document the physics was checked against
+before any code existed, kept because it is the record of that review. It is
+not a description of the library as it stands.**
+
+Five things were built after it was written and are not in it: the piping
+geometry factor Fp and FLP, the Reynolds flow regime screening, the fluid
+property table, the material screening, and the travel curves that read FL
+and xT off published data at the duty's own operating point.
+
+Two numbers in it were later found wrong and are corrected in the code, not
+here. N9 in the gas equation shipped 185 times too small before being derived
+properly and then verified against the tabulated standard value. N2 in the
+piping factor was 1.79 times too large because a Cv to Kv conversion was
+applied backwards.
+
+**For what the library actually does, read the README and the module
+docstrings, which are kept current. For what is still open, read
+RESEARCH.md.**
+
+The original text follows unchanged.
+
+---
 
 Nothing is implemented yet. This document exists so the physics is checked
 before any code is written, which is the order the brief sets.

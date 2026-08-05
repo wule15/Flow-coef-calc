@@ -186,8 +186,14 @@ class TestChokedGasLimits:
             relative_density=1.0, gamma=1.4, xt=0.75,
         )
         assert r.is_choked
-        assert r.expansion_factor == pytest.approx(Y_CHOKED, rel=1e-12)
-        assert Y_CHOKED == pytest.approx(2.0 / 3.0, rel=1e-12)
+        # Y at the limit falls out of the equation rather than being pasted
+        # in, so derive it here from the expression itself rather than
+        # asserting the constant against its own literal.
+        fg, xt = r.gamma_factor, r.xt
+        derived = 1.0 - (fg * xt) / (3.0 * fg * xt)
+        assert derived == pytest.approx(2.0 / 3.0, rel=1e-12)
+        assert r.expansion_factor == pytest.approx(derived, rel=1e-12)
+        assert Y_CHOKED == pytest.approx(derived, rel=1e-12)
 
     def test_x_is_clamped_to_the_limiting_ratio(self):
         r = gas_flow_coefficient(
