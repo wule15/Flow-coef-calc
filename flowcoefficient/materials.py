@@ -22,19 +22,27 @@ recommendation made on one variable out of five.
 
 The low temperature limit is the one that bites
 -----------------------------------------------
--29 C is the ASME B31.3 impact test exemption limit for ordinary carbon
-steel, and EN 13480 works to a similar boundary. Below it the steel loses
-toughness and can fail in a brittle manner without warning. Joule-Thomson
+In Europe the governing requirement is EN 13480-2 for industrial piping and
+EN 13445-2 for pressure vessels, both under the Pressure Equipment Directive
+2014/68/EU. They set the impact testing a steel needs for its design minimum
+temperature, and for ordinary carbon steel that boundary sits around -29 C,
+which is also the ASME B31.3 exemption limit quoted in American practice.
+Below it the steel loses toughness and can fail in a brittle manner without
+warning. Joule-Thomson
 cooling on a gas letdown routinely lands below that line while the inlet is
 at a comfortable ambient temperature, which is exactly the case an engineer
 is most likely to miss.
 
 Sources
 -------
-ASTM A216, A217, A351, A352 for the cast grades and their service ranges.
-EN 10213 for the European cast grades. ASME B31.3 Table 323.2.2 for the
-impact test exemption. Ranges below are the commonly quoted service limits
-and are a screening aid, not a substitute for the material standard.
+EN 10213 for the European cast steel grades, which is the primary reference
+here. ASTM A216, A217, A351 and A352 for the American equivalents, given
+alongside because datasheets cross borders. EN 13480-2 and EN 13445-2 for the
+low temperature requirement under PED 2014/68/EU, with ASME B31.3 Table
+323.2.2 as the American counterpart.
+
+Ranges below are commonly quoted service limits and are a screening aid, not
+a substitute for the material standard.
 """
 
 from __future__ import annotations
@@ -55,7 +63,7 @@ class Material:
     note: str
 
     def __str__(self) -> str:
-        return f'{self.asme} / {self.en_number} {self.en_name}'
+        return f'{self.en_number} {self.en_name} / {self.asme}'
 
 
 MATERIALS: tuple[Material, ...] = (
@@ -154,7 +162,8 @@ def screen_materials(
     if low < CARBON_STEEL_FLOOR_C:
         headline = (
             f'Coldest metal temperature approximately {low:.0f} C, below the '
-            f'{CARBON_STEEL_FLOOR_C:.0f} C ASME B31.3 impact test exemption. '
+            f'{CARBON_STEEL_FLOOR_C:.0f} C impact test boundary of EN 13480-2 '
+            f'and ASME B31.3. '
             f'Ordinary carbon steel is excluded.'
         )
     elif high > 425:

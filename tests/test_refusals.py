@@ -169,7 +169,8 @@ class TestDidNotCheckIsNotTheSameAsClear:
             pressure_basis='absolute', fluid='water', temperature=80,
             valve_style='globe')
         assert r.choked_check_performed is True
-        assert r.fl_source == 'typical for globe'
+        assert r.fl_source.startswith('placeholder for globe')
+        assert 'Published span 0.83 to 0.93' in r.fl_source
 
     def test_supplied_fl_beats_the_style_default(self):
         r = liquid_flow_coefficient(

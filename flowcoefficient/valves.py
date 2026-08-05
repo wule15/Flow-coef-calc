@@ -1,9 +1,39 @@
 """
-Valve style data: FL and xT.
+Valve style data: FL, xT and Fd.
 
-Both are properties of a particular valve, measured by flow test to
-IEC 60534-2-3 and published by the manufacturer per size and per travel.
-They are not properties of the process.
+The thing to understand before using this table
+-----------------------------------------------
+**FL and xT are not constants. They vary across the valve travel, and for a
+rotary valve they vary enormously.**
+
+Measured data, from the Valmet/Neles control valve sizing coefficients
+catalogue 10CV20EN, which publishes them against Cv/d-squared at ten travel
+points from nearly closed to fully open:
+
+    valve                        FL              xT
+    RotaryGlobe, linear trim     0.93 -> 0.83    0.69 -> 0.70
+    V-port segment ball          0.94 -> 0.42    0.64 -> 0.16
+    Full bore ball, trunnion     0.91 -> 0.28    0.82 -> 0.05
+    Eccentric rotary plug        0.91 -> 0.76    0.62 -> 0.40
+    Triple eccentric disc        0.87 -> 0.36    0.53 -> 0.11
+    Butterfly, soft seated       0.87 -> 0.40    0.68 -> 0.15
+    Butterfly, concentric disc   0.83 -> 0.48    0.46 -> 0.28
+
+A full bore ball's xT spans a factor of sixteen across its own travel. Any
+single number for it is a point on a curve, not a property of the style.
+
+So the figures below are **mid-travel placeholders**, chosen inside the
+published range so the library can answer when you have no data sheet. They
+are not from a standard and must not be cited as if they were. Every result
+carries the published span alongside the value it used, so nobody mistakes a
+placeholder for a measurement.
+
+EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these.
+EN IEC 60534-2-1 Annex D, Table D.1, tabulates its own typical values and is
+marked **informative**, not normative, for exactly this reason.
+
+A sizing that has to be right takes FL and xT from the data sheet for the
+valve being specified, at the travel it will actually work at.
 
 Why there are no silent defaults
 --------------------------------
@@ -35,6 +65,13 @@ class ValveStyle:
     xt: float
     note: str
     fd: float = 0.46
+    fl_range: tuple[float, float] = (0.0, 1.0)
+    xt_range: tuple[float, float] = (0.0, 1.0)
+    """
+    Published span across the valve travel, fully open to nearly closed.
+    Carried so a caller can see how much of a placeholder the single value
+    above really is.
+    """
     """
     Valve style modifier, IEC 60534-2-1 Annex A. Describes the shape of the
     flow passage and is used only in the Reynolds number screening. A single
@@ -42,24 +79,42 @@ class ValveStyle:
     """
 
 
-# Mid-range values from published manufacturer data and IEC 60534-2-1
-# Annex A typical values. Every one of these varies with size, trim and
-# travel, which is exactly why they are labelled typical in the result.
+# Typical published manufacturer figures, mid-range across catalogues. NOT a
+# reproduction of EN IEC 60534-2-1 Annex A; see the module docstring. The
+# rotary entries in particular vary widely between makers, and a full bore
+# ball is quoted anywhere from xT 0.15 to 0.42 depending on trim and travel.
+# Every one of these varies with size, trim and travel, which is why the
+# result records them as typical rather than measured.
 VALVE_STYLES: dict[str, ValveStyle] = {
     'globe': ValveStyle('globe', fl=0.90, xt=0.75, fd=0.46,
+                        fl_range=(0.83, 0.93), xt_range=(0.69, 0.75),
                         note='single seat, parabolic plug, flow to open'),
-    'globe cage': ValveStyle('globe cage', fl=0.90, xt=0.75, fd=0.98,
-                             note='cage guided, balanced plug'),
-    'angle': ValveStyle('angle', fl=0.85, xt=0.72, fd=0.46,
-                        note='flow to close'),
+    'globe cage': ValveStyle('globe cage', fl=0.95, xt=0.75, fd=0.41,
+                             fl_range=(0.95, 0.97), xt_range=(0.69, 0.75),
+                             note='cage guided, balanced plug. Fd was 0.98, '
+                                  'which is the segmented ball figure and '
+                                  'looked copied; a multi-port cage is '
+                                  'nearer 0.41'),
+    'angle': ValveStyle('angle', fl=0.85, xt=0.72, fd=1.00,
+                        fl_range=(0.80, 0.90), xt_range=(0.65, 0.75),
+                        note='flow to close. Fd 1.00, a single flow passage'),
     'butterfly': ValveStyle('butterfly', fl=0.70, xt=0.35, fd=0.57,
-                            note='60 degree open, swing through'),
+                            fl_range=(0.40, 0.87), xt_range=(0.15, 0.68),
+                            note='soft seated, mid travel. A concentric disc '
+                                 'runs lower on xT, 0.28 to 0.46'),
     'ball': ValveStyle('ball', fl=0.60, xt=0.20, fd=1.00,
-                       note='full bore, chokes far earlier than a globe'),
+                       fl_range=(0.28, 0.91), xt_range=(0.05, 0.82),
+                       note='full bore trunnion mounted, around 80 percent '
+                            'open. xT spans a factor of 16 across the travel, '
+                            'so this figure is a placeholder more than most'),
     'segmented ball': ValveStyle('segmented ball', fl=0.66, xt=0.25, fd=0.98,
-                                 note='V notch, 60 degree open'),
-    'eccentric plug': ValveStyle('eccentric plug', fl=0.85, xt=0.68, fd=0.42,
-                                 note='rotary, flow to open'),
+                                 fl_range=(0.42, 0.94), xt_range=(0.16, 0.64),
+                                 note='V port, mid to open travel'),
+    'eccentric plug': ValveStyle('eccentric plug', fl=0.85, xt=0.55, fd=0.42,
+                                 fl_range=(0.76, 0.91), xt_range=(0.40, 0.62),
+                                 note='rotary, flow to open. xT was 0.68, '
+                                      'above the published span, now mid '
+                                      'range'),
 }
 
 
@@ -101,7 +156,12 @@ def resolve_fl(fl: float | None, valve_style: str | None) -> tuple[float | None,
         return fl, 'supplied'
     if valve_style is not None:
         style = get_valve_style(valve_style)
-        return style.fl, f'typical for {style.name}'
+        lo, hi = style.fl_range
+        return style.fl, (
+            f'placeholder for {style.name} at mid travel. Published span '
+            f'{lo:.2f} to {hi:.2f} across the travel, so take the data sheet '
+            f'figure for a sizing that has to be right'
+        )
     return None, 'not provided'
 
 
@@ -112,5 +172,10 @@ def resolve_xt(xt: float | None, valve_style: str | None) -> tuple[float | None,
         return xt, 'supplied'
     if valve_style is not None:
         style = get_valve_style(valve_style)
-        return style.xt, f'typical for {style.name}'
+        lo, hi = style.xt_range
+        return style.xt, (
+            f'placeholder for {style.name} at mid travel. Published span '
+            f'{lo:.2f} to {hi:.2f} across the travel, so take the data sheet '
+            f'figure for a sizing that has to be right'
+        )
     return None, 'not provided'

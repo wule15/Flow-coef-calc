@@ -1,6 +1,6 @@
 # Flow Coefficient
 
-Valve sizing to IEC 60534-2-1. Works out the flow coefficient a duty needs, and tells you when the answer stopped meaning what you think it means.
+Valve sizing to EN IEC 60534-2-1. Works out the flow coefficient a duty needs, and tells you when the answer stopped meaning what you think it means.
 
 Python 3.10 or newer. No dependencies, and there is a test that enforces that.
 
@@ -56,7 +56,7 @@ print(result.opening)
 
 **Seven fluids**, water, steam, air, nitrogen, methane, carbon dioxide and ammonia. Vapour pressure is stored as Antoine constants rather than a single number, because water at 20 C is 0.023 bar and at 80 C is 0.474 bar, and vapour pressure feeds straight into the cavitation check. Outside the range the constants were fitted over, the library raises rather than extrapolating.
 
-**Seven valve styles** with typical FL, xT and Fd. Supplying your own beats the typical value, and the result records which it used.
+**Seven valve styles** with placeholder FL, xT and Fd. Read the next section before relying on them.
 
 **Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 9.5 percent, and a reduced bore ball in a line two sizes up can lose 40 percent. Without the correction the sizing is optimistic by exactly that much.
 
@@ -75,19 +75,52 @@ print(result.opening)
 Same duty, same pressures, two valve styles:
 
 ```python
-duty = dict(flow_rate=500, inlet_pressure=7.0, outlet_pressure=5.0,
+duty = dict(flow_rate=800, inlet_pressure=10.0, outlet_pressure=5.0,
             pressure_basis='absolute', temperature=20, fluid='air')
 
-gas_flow_coefficient(**duty, valve_style='globe')
-# Kv 5.756 (Cv 6.654) | x 0.286, Y 0.873 | not choked
+gas_flow_coefficient(**duty, xt=0.75)   # globe
+# Cv  6.32 | x 0.500, Y 0.778 | not choked
 
-gas_flow_coefficient(**duty, valve_style='ball')
-# Kv 9.009 (Cv 10.41) | x 0.286, Y 0.667 | CHOKED
+gas_flow_coefficient(**duty, xt=0.20)   # full bore ball
+# Cv 11.66 | x 0.500, Y 0.667 | CHOKED
 ```
 
-The ball valve is choked and needs 57 percent more capacity. xT is around 0.75 for a globe and around 0.20 for a ball, so a ball chokes at a far smaller pressure drop. A library that defaulted xT to the globe figure would report the same coefficient for both, and you would install a valve that cannot pass the flow.
+At a pressure drop ratio of 0.5 the ball is choked and the globe is not, so the ball needs substantially more capacity for the identical duty. A library that defaulted xT to the globe figure would report the same coefficient for both, and you would install a valve that cannot pass the flow.
+
+Published xT for a full bore ball runs from about 0.42 down to 0.05 over its normal control range, so **this conclusion holds anywhere a ball is realistically operated.** That is the point: it does not depend on which single figure you trust, only on a ball's xT being far below a globe's. It is also why the library refuses to default xT at all.
 
 That is why xT has no default, and why the result carries `is_choked` instead of returning a bare number.
+
+---
+
+## The valve data is the weakest thing in here, and it says so
+
+**FL and xT are not constants. They vary across the valve travel, and for a rotary valve they vary enormously.**
+
+Measured figures, from the Valmet/Neles sizing coefficients catalogue 10CV20EN, which publishes them against Cv/d² at ten travel points from nearly closed to fully open:
+
+| valve | FL | xT |
+|---|---|---|
+| RotaryGlobe, linear trim | 0.93 to 0.83 | 0.69 to 0.70 |
+| V-port segment ball | 0.94 to 0.42 | 0.64 to 0.16 |
+| Full bore ball, trunnion | 0.91 to 0.28 | **0.82 to 0.05** |
+| Eccentric rotary plug | 0.91 to 0.76 | 0.62 to 0.40 |
+| Triple eccentric disc | 0.87 to 0.36 | 0.53 to 0.11 |
+| Butterfly, soft seated | 0.87 to 0.40 | 0.68 to 0.15 |
+| Butterfly, concentric disc | 0.83 to 0.48 | 0.46 to 0.28 |
+
+A full bore ball's xT spans a **factor of sixteen** across its own travel. Any single number for it is a point on a curve, not a property of the style.
+
+So the figures in this library are **mid-travel placeholders**, picked inside the published range so it can answer when you have no data sheet. They are not from a standard and are not cited as if they were. Every result carries the published span next to the value it used:
+
+```
+xT used   : 0.2
+xT source : placeholder for ball at mid travel. Published span 0.05 to 0.82
+            across the travel, so take the data sheet figure for a sizing
+            that has to be right
+```
+
+EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these. EN IEC 60534-2-1 Annex D, Table D.1 gives its own typical values and is marked **informative**, not normative, for the same reason.
 
 ---
 
@@ -199,12 +232,15 @@ The ones that matter are in `tests/test_standard_examples.py`, because they comp
 
 | | |
 |---|---|
-| IEC 60534-2-1 | Sizing equations for fluid flow under installed conditions. Clause 6 flow regime, clause 7 liquid, clause 8 gas |
-| IEC 60534-2-3 | Flow capacity test procedures, the source of published FL, xT and Fd |
+| EN IEC 60534-2-1 | Sizing equations for fluid flow under installed conditions. Clause 5 piping geometry, 6 flow regime, 7 liquid, 8 gas. Identical text to IEC 60534-2-1 |
+| EN IEC 60534-2-3 | Flow capacity test procedures. Defines how FL and xT are measured. The values here are **not** taken from it |
+| EN 13480-2 | Metallic industrial piping, materials. Low temperature requirement under PED 2014/68/EU |
+| EN 13445-2 | Unfired pressure vessels, materials |
+| EN 10213 | Steel castings for pressure purposes. Primary source for the body grades |
 | API RP 14E | Erosional velocity limit for piping |
-| ASME B31.3 | Impact test exemption at -29 C, the carbon steel floor |
-| ASTM A216, A217, A351, A352 | Cast valve body grades |
-| EN 10213 | European cast valve body grades |
+| ASME B31.3 | American counterpart to EN 13480 for the -29 C impact test boundary |
+| ASTM A216, A217, A351, A352 | American cast grades, given beside the EN numbers |
+| Valmet 10CV20EN | Manufacturer sizing coefficients catalogue, source of the published FL and xT spans |
 | NIST Chemistry WebBook | Antoine constants and critical properties |
 
 ---
@@ -214,6 +250,8 @@ The ones that matter are in `tests/test_standard_examples.py`, because they comp
 The three I would raise first if you were reviewing this.
 
 **A numerical constant was wrong by 185x and nothing internal caught it.** That was found by luck, not by process. There is now a cross-check and a magnitude assertion guarding the gas path, but the episode says something about the shape of the risk here: this library can be entirely self-consistent and wrong, and the only defence is comparison against outside sources. There are five such comparisons. There should be more.
+
+**The valve style table is a set of placeholders, not measurements.** FL and xT vary by up to a factor of sixteen across a rotary valve's travel, so a single number per style is a convenience and nothing more. The library states the published span on every result and refuses to default xT, but a caller who ignores both will get a number built on a placeholder.
 
 **Fluid property data is a small hand-entered table.** Seven fluids, each cited, each with a validity range that is enforced. But a wrong Antoine constant would be invisible until somebody's cavitation prediction was wrong, and only water and ammonia are checked against published vapour pressures.
 
