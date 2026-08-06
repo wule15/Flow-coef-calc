@@ -38,6 +38,8 @@ from .errors import (
     UnknownUnitError,
 )
 from .fluids import FLUIDS, Fluid, ff_critical_pressure_ratio, get_fluid
+from .cavitation import CavitationIndex
+from .cavitation import evaluate as evaluate_cavitation
 from .checks import OpeningCheck, VelocityCheck, check_opening, check_velocity
 from .gas import GasSizingResult, gas_flow_coefficient
 from .materials import MATERIALS, Material, MaterialGuidance, screen_materials
@@ -84,6 +86,7 @@ __all__ = [
     'screen_materials', 'Material', 'MATERIALS', 'MaterialGuidance',
     'flow_from_thermal_duty', 'estimate_joule_thomson', 'JouleThomsonEstimate',
     'check_velocity', 'check_opening', 'VelocityCheck', 'OpeningCheck',
+    'evaluate_cavitation', 'CavitationIndex',
     'screen_flow_regime', 'FlowRegime',
     'get_valve_style',
     'ValveStyle',

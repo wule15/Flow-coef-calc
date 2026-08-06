@@ -62,6 +62,10 @@ print(result.opening)
 
 **Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 9.5 percent, and a reduced bore ball in a line two sizes up can lose 40 percent. Without the correction the sizing is optimistic by exactly that much.
 
+**Cavitation and flashing, not just choking.** Choked flow is the last event in a sequence, not the first: a valve can report "not choked" for years while eroding its trim. The library reports the ISA RP75.23 index `sigma = (p1 - pv) / (p1 - p2)` on every liquid duty, and compares it against a threshold when you supply one from a data sheet. It carries no thresholds of its own, because RP75.23 is explicit that they vary with both pressure and valve size, so a single number per style would be wrong in a way no better number could fix.
+
+**Flashing is detected and refused rather than answered.** If the outlet sits below the vapour pressure the liquid leaves the valve as a two-phase mixture. EN IEC 60534-2-1 does not cover multiphase flow and ANSI/ISA-75.01.01 states the same exclusion in as many words, so the result says the coefficient describes a liquid that is not what is actually flowing, and points you at a package with a homogeneous equilibrium model.
+
 **Flow regime screening.** Give it a viscosity and it works out the valve Reynolds number and tells you if the flow left the turbulent range the equations assume.
 
 **Joule-Thomson cooling** estimated on gas, so a 60 bar CO2 letdown reports an outlet around -41 C instead of quietly handing you a valve body that will be brittle.
@@ -129,7 +133,6 @@ EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these. EN 
 ## What it does not do
 
 - **The Reynolds number factor FR is not implemented.** Viscous flow is screened and reported, not corrected. A transitional or laminar answer comes back labelled and should not be trusted as it stands.
-- Cavitation is detected at full choking only. Damage can begin before that point and the library will not flag it.
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
 - Material screening is on temperature alone, and runs on the gas path only, since it exists to catch Joule-Thomson cooling. It excludes grades, it does not select one.
 - Liquid density is not corrected for temperature. The result says so when the flowing temperature is far from the tabulated one.
@@ -224,7 +227,7 @@ pytest
 
 ## Tests
 
-291 tests, no network, no files, nothing mocked.
+299 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
@@ -248,6 +251,7 @@ The ones that matter are in `tests/test_standard_examples.py`, because they comp
 | EN 13445-2 | Unfired pressure vessels, materials |
 | EN 10213 | Steel castings for pressure purposes. Primary source for the body grades |
 | API RP 14E | Erosional velocity limit for piping |
+| ISA RP75.23 | Considerations for evaluating control valve cavitation. The sigma index and its thresholds |
 | ASME B31.3 | American counterpart to EN 13480 for the -29 C impact test boundary |
 | ASTM A216, A217, A351, A352 | American cast grades, given beside the EN numbers |
 | Valmet 10CV20EN | Manufacturer sizing coefficients catalogue, source of the published FL and xT spans |

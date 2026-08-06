@@ -29,6 +29,8 @@ from dataclasses import dataclass
 
 from .checks import (OpeningCheck, VELOCITY_NOT_CHECKED, VelocityCheck,
                      check_opening, check_velocity)
+from .cavitation import NOT_COMPUTED as CAV_NOT_COMPUTED, CavitationIndex
+from .cavitation import evaluate as evaluate_cavitation
 from .coefficients import kv_to_cv
 from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
                      InvalidPressureError, OutOfRangeError)
@@ -74,6 +76,7 @@ class LiquidSizingResult:
     flow_source: str = 'supplied'
     relative_density_source: str = 'supplied'
     operating_point: OperatingPoint = NOT_LOCATED
+    cavitation: CavitationIndex = CAV_NOT_COMPUTED
     velocity: VelocityCheck = VELOCITY_NOT_CHECKED
     piping: PipingGeometry = FP_NOT_APPLIED
     kv_bare_valve: float = 0.0
@@ -88,6 +91,10 @@ class LiquidSizingResult:
         if self.flow_regime.checked and self.flow_regime.correction_needed:
             regime = f" | {self.flow_regime.regime.upper()}, turbulent equations do not apply"
         extra = ''
+        if self.cavitation.flashing:
+            extra += ' | FLASHING, two-phase at outlet'
+        elif self.cavitation.computed and self.cavitation.acceptable is False:
+            extra += f' | sigma {self.cavitation.sigma:.3g} below threshold'
         if self.piping.checked and self.piping.fp < 1.0:
             extra += f' | Fp {self.piping.fp:.3g}'
         if self.velocity.checked:
@@ -118,6 +125,8 @@ def liquid_flow_coefficient(
     valve_style: str | None = None,
     vapour_pressure: float | None = None,
     critical_pressure: float | None = None,
+    sigma_threshold: float | None = None,
+    sigma_threshold_name: str = 'the supplied threshold',
     kinematic_viscosity: float | None = None,
     valve_diameter_mm: float | None = None,
     pipe_diameter_mm: float | None = None,
@@ -388,6 +397,17 @@ def liquid_flow_coefficient(
     )
     opening = check_opening(kv, rated_kv)
 
+    # Cavitation and flashing. Separate from the choked check, which only
+    # fires at the far end of the sequence: a valve can be eroding its trim
+    # for years while reporting "not choked".
+    cavitation = evaluate_cavitation(
+        inlet_pressure_bar_a=p1,
+        outlet_pressure_bar_a=p2,
+        vapour_pressure_bar=pv,
+        sigma_threshold=sigma_threshold,
+        threshold_name=sigma_threshold_name,
+    )
+
     return LiquidSizingResult(
         kv=kv,
         cv=kv_to_cv(kv),
@@ -413,6 +433,7 @@ def liquid_flow_coefficient(
         opening=opening,
         piping=piping,
         kv_bare_valve=kv_bare,
+        cavitation=cavitation,
     )
 
 

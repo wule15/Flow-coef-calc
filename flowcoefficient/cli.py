@@ -82,12 +82,15 @@ def _report_liquid(result) -> None:
         print(_line('Fp', str(result.piping)))
     if result.operating_point.located:
         print(_line('operating point', str(result.operating_point)))
+    if result.cavitation.computed:
+        print(_line('cavitation', str(result.cavitation)))
     print(_line('flow regime', str(result.flow_regime)))
     if result.velocity.checked:
         print(_line('line velocity', str(result.velocity)))
     if result.opening.checked:
         print(_line('valve opening', str(result.opening)))
-    _print_warnings(_warnings(result.velocity, result.opening), result)
+    _print_warnings(
+        _warnings(result.velocity, result.opening, result.cavitation), result)
 
 
 def _report_gas(result) -> None:
@@ -189,6 +192,10 @@ def build_parser() -> argparse.ArgumentParser:
     liq.add_argument('--sg', dest='relative_density', type=float, help='relative density')
     liq.add_argument('--fl', type=float, help='liquid pressure recovery factor')
     liq.add_argument('--viscosity', type=float, help='kinematic viscosity in cSt')
+    liq.add_argument('--sigma-min', dest='sigma_threshold', type=float,
+                     help='manufacturer cavitation threshold, sigma_mr or '
+                          'sigma_id from the data sheet. Without it the index '
+                          'is reported but not judged')
 
     gas = sub.add_parser('gas', help='size for a gas or vapour')
     _add_shared(gas)
@@ -255,6 +262,8 @@ def main(argv: list[str] | None = None) -> int:
                 relative_density=args.relative_density, fluid=args.fluid,
                 temperature=args.temp, fl=args.fl, valve_style=args.valve_style,
                 kinematic_viscosity=args.viscosity,
+                sigma_threshold=args.sigma_threshold,
+                sigma_threshold_name='the supplied sigma threshold',
                 pipe_diameter_mm=args.pipe_diameter_mm,
                 valve_diameter_mm=args.valve_diameter_mm,
                 rated_kv=args.rated_kv, units=args.units,
