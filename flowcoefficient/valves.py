@@ -65,12 +65,19 @@ class ValveStyle:
     xt: float
     note: str
     fd: float = 0.46
+    """
+    Valve style modifier, used only by the Reynolds screening. It describes
+    the shape of the flow passage: a single round orifice is 1.0, a parabolic
+    plug splitting the flow is lower.
+    """
+
     fl_range: tuple[float, float] = (0.0, 1.0)
     xt_range: tuple[float, float] = (0.0, 1.0)
     """
     Published span across the valve travel, fully open to nearly closed.
-    Carried so a caller can see how much of a placeholder the single value
-    above really is.
+    Derived from this style's own travel curve at import, so it cannot drift
+    from the curve it describes. Carried so a caller can see how much of a
+    placeholder the single fl and xt above really are.
     """
     """
     Valve style modifier, IEC 60534-2-1 Annex A. Describes the shape of the

@@ -2,7 +2,8 @@
 Command line interface. Standard library only, argparse.
 
     flowcoeff liquid --flow 25 --p1 6 --p2 4 --basis absolute
-    flowcoeff gas --flow 500 --p1 7 --p2 5 --basis absolute --temp 20 --fluid air
+    flowcoeff gas --flow 500 --p1 7 --p2 5 --basis absolute --temp 20 \
+                  --fluid air --style globe
     flowcoeff convert --kv 17.68
     flowcoeff fluids
     flowcoeff valves
@@ -154,7 +155,10 @@ def _add_shared(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--basis', required=True, choices=['absolute', 'gauge'],
                         help='required, there is no default')
     parser.add_argument('--units', choices=['metric', 'imperial'], default='metric')
-    parser.add_argument('--fluid', help=f'one of: {", ".join(sorted(FLUIDS))}')
+    parser.add_argument('--fluid',
+                        help=f'one of: {", ".join(sorted(FLUIDS))}. '
+                             f'Aliases co2, nh3, n2, ch4, h2o and '
+                             f'"natural gas" are also accepted')
     parser.add_argument('--style', dest='valve_style',
                         help=f'one of: {", ".join(sorted(VALVE_STYLES))}')
     parser.add_argument('--bore', dest='valve_diameter_mm', type=float,
@@ -193,7 +197,8 @@ def build_parser() -> argparse.ArgumentParser:
     gas.add_argument('--sg', dest='relative_density', type=float, help='relative to air')
     gas.add_argument('--gamma', type=float, help='ratio of specific heats')
     gas.add_argument('--xt', type=float, help='pressure differential ratio factor')
-    gas.add_argument('--z', dest='compressibility', type=float, default=1.0)
+    gas.add_argument('--z', dest='compressibility', type=float, default=1.0,
+                     help='compressibility factor Z, default 1.0 for ideal gas')
 
     conv = sub.add_parser('convert', help='Kv and Cv conversion')
     group = conv.add_mutually_exclusive_group(required=True)
@@ -233,9 +238,12 @@ def main(argv: list[str] | None = None) -> int:
             for name, v in sorted(VALVE_STYLES.items()):
                 print(f'{name:<16}{v.fl:>7.2f}{v.xt:>7.2f}{v.fd:>7.2f}  {v.note}')
             print()
-            print('  Typical published values. Supply the manufacturer figure when')
-            print('  you have it: xT is 0.75 for a globe and 0.20 for a ball, and')
-            print('  using the wrong one undersizes the valve.')
+            print('  Placeholders at mid travel, not values from a standard.')
+            print('  FL and xT vary across the valve travel, by a factor of')
+            print('  sixteen on a full bore ball, so one figure per style is a')
+            print('  convenience and nothing more. Give --bore and --rated-kv')
+            print('  and the duty is placed on the published curve instead of')
+            print('  using the numbers above.')
             return 0
 
         if args.command == 'liquid':
@@ -254,9 +262,13 @@ def main(argv: list[str] | None = None) -> int:
             _report_liquid(result)
             return 0
 
+        if (args.p2 is None) == (args.dp is None):
+            print('\n  refused: give either --p2 or --dp, not both and not '
+                  'neither\n', file=sys.stderr)
+            return 2
         result = gas_flow_coefficient(
             flow_rate=args.flow, inlet_pressure=args.p1,
-            outlet_pressure=args.p2 if args.p2 is not None else args.p1 - (args.dp or 0),
+            outlet_pressure=args.p2 if args.p2 is not None else args.p1 - args.dp,
             pressure_basis=args.basis, temperature=args.temp,
             relative_density=args.relative_density, fluid=args.fluid,
             gamma=args.gamma, xt=args.xt, valve_style=args.valve_style,

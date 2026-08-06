@@ -268,11 +268,13 @@ def locate(
     # back to the placeholder, and gets an answer 85 percent different with a
     # note claiming no bore was supplied.
     curve = CURVES.get(style_name.strip().lower()) if style_name else None
-    if curve is None:
-        return NOT_LOCATED
     if rated_kv is None or valve_diameter_mm is None:
+        # Inputs missing, so nothing could have been located whether or not a
+        # curve exists for this style.
         return NOT_LOCATED
     if curve is None:
+        # Inputs WERE supplied and were simply not usable. Saying "no bore
+        # supplied" here would be false, which is why this state exists.
         return NO_CURVE
     if rated_kv <= 0 or valve_diameter_mm <= 0 or required_kv <= 0:
         return NOT_LOCATED

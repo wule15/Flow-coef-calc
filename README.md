@@ -52,11 +52,13 @@ print(result.opening)
 
 **Absolute or gauge**, and you must say which. There is no default. A gauge reading treated as absolute produces a confident wrong answer with nothing in the output to reveal it, and stating the basis costs one word.
 
-**Metric or imperial** in and out. Inputs are converted to bar and cubic metres per hour on entry, so there is one set of equations rather than a constants table per unit system.
+**Metric or imperial in.** Inputs are converted to bar and cubic metres per hour on entry, so there is one set of equations rather than a constants table per unit system. Results are always reported in bar and m3/h whatever went in, and always carry both Kv and Cv.
 
-**Seven fluids**, water, steam, air, nitrogen, methane, carbon dioxide and ammonia. Vapour pressure is stored as Antoine constants rather than a single number, because water at 20 C is 0.023 bar and at 80 C is 0.474 bar, and vapour pressure feeds straight into the cavitation check. Outside the range the constants were fitted over, the library raises rather than extrapolating.
+**Seven fluids**, water, steam, air, nitrogen, methane, carbon dioxide and ammonia. Vapour pressure is stored as Antoine constants rather than a single number, because water at 20 C is 0.023 bar and at 80 C is 0.474 bar, and vapour pressure feeds straight into the cavitation check. Outside the range the constants were fitted over, the fluid table raises rather than extrapolating. The sizing functions catch that, skip the cavitation check and report `choked_check_performed=False`, rather than refusing an otherwise ordinary duty: water above 100 C is a common service and used to fail outright.
 
-**Seven valve styles** with placeholder FL, xT and Fd. Read the next section before relying on them.
+**Nine valve styles** with placeholder FL, xT and Fd. Read the next section before relying on them.
+
+**Coefficients that follow the valve opening.** FL and xT are published against Cv/d², not as one number per style, and a full bore ball's xT spans a factor of sixteen across its own travel. Give a valve bore and a candidate rated Kv and the duty is placed on the published curve and the coefficients read off it, iterating to a tolerance because the coefficient and xT depend on each other. The result then says where the duty landed, and whether the valve will merely pass the flow or actually suit it.
 
 **Piping geometry factor Fp**, IEC clause 5. A valve is routinely a size or two smaller than its line, and the reducers cost capacity. Give it the valve bore, the line bore and a candidate rated Kv and it corrects for them. A DN50 valve in a DN80 line loses about 9.5 percent, and a reduced bore ball in a line two sizes up can lose 40 percent. Without the correction the sizing is optimistic by exactly that much.
 
@@ -101,7 +103,7 @@ Measured figures, from the Valmet/Neles sizing coefficients catalogue 10CV20EN, 
 
 | valve | FL | xT |
 |---|---|---|
-| RotaryGlobe, linear trim | 0.93 to 0.83 | 0.69 to 0.70 |
+| RotaryGlobe, linear trim | 0.93 to 0.83 | 0.72 down to 0.61 and back to 0.70 |
 | V-port segment ball | 0.94 to 0.42 | 0.64 to 0.16 |
 | Full bore ball, trunnion | 0.91 to 0.28 | **0.82 to 0.05** |
 | Eccentric rotary plug | 0.91 to 0.76 | 0.62 to 0.40 |
@@ -133,6 +135,7 @@ EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these. EN 
 - Liquid density is not corrected for temperature. The result says so when the flowing temperature is far from the tabulated one.
 - The Joule-Thomson figure is an order of magnitude estimate, not a design number.
 - No graphical or web interface yet. There is a library and a command line tool.
+- The CLI does not expose every API parameter. `vapour_pressure`, `critical_pressure`, `specific_heat`, `downstream_diameter_mm`, `intermittent_service` and `atmospheric_pressure_bar` are library-only, so an error message suggesting you pass one of them is addressed to the API rather than the command line.
 
 ---
 
@@ -176,16 +179,23 @@ flowcoeff liquid --duty 250 --t-in 10 --t-out 20 --fluid water                  
   pressure basis             gauge
   inlet                      5.013 bar absolute
   outlet                     3.513 bar absolute
-  flow                       21.52 m3/h (from thermal duty 250.0 kW over 10 C)
+  flow                       21.52 m3/h (from thermal duty 250.0 kW over 10 C, cp 4.186 kJ/kg K)
+  relative density           1
+  fluid                      water
   vapour pressure            0.01201 bar
-  FL                         0.9 (typical for globe)
+  FF                         0.9579
+  FL                         0.9 (placeholder for globe at mid travel. Published span 0.83
+                             to 0.93 across the travel, so take the data sheet figure for a
+                             sizing that has to be right)
 
   choked flow                not choked
-  flow regime                not checked, turbulent assumed
+  flow regime                flow regime not checked, turbulent assumed
   line velocity              2.76 m/s (erosional limit 3.9 m/s)
   valve opening              required Kv 17.57 is 28 percent of rated 63
 --------------------------------------------------------------
 ```
+
+Add `--bore` alongside `--rated-kv` and the FL line changes from a placeholder to a figure read off the published curve at the duty's own operating point, and an `operating point` line appears saying where that is.
 
 Every figure that fed the answer is shown, and anything the library declined to check says so rather than being left blank, because a blank line reads as a clean bill of health.
 
@@ -214,7 +224,7 @@ pytest
 
 ## Tests
 
-231 tests, no network, no files, nothing mocked.
+291 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
