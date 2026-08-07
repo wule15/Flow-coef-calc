@@ -244,7 +244,12 @@ FLUIDS: dict[str, Fluid] = {
         antoine=Antoine(
             a=6.81228, b=1301.679, c=-3.494,
             min_k=154.26, max_k=195.89,
-            source=f'{_NIST}, Giauque and Egan 1937',
+            source=f'{_NIST}, Giauque and Egan 1937. NOTE: this is a '
+                   f'SUBLIMATION curve over solid CO2. Its whole range sits '
+                   f'below the 216.6 K triple point, so it is not a liquid '
+                   f'vapour pressure and cannot serve a liquid cavitation '
+                   f'check. The range guard refuses every real liquid CO2 '
+                   f'duty, which is why it is safe, but it offers nothing',
         ),
         liquid_density_kg_m3=1178.0,
         liquid_density_temperature_c=-56.6,
@@ -268,7 +273,7 @@ FLUIDS: dict[str, Fluid] = {
         antoine=Antoine(
             a=4.86886, b=1113.928, c=-10.409,
             min_k=239.6, max_k=371.5,
-            source=f'{_NIST}, Overstreet and Giauque 1937',
+            source=f'{_NIST}, Stull 1947',
         ),
         liquid_density_kg_m3=618.0,
         liquid_density_temperature_c=15.0,

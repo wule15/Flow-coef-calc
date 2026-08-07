@@ -22,13 +22,18 @@ recommendation made on one variable out of five.
 
 The low temperature limit is the one that bites
 -----------------------------------------------
-In Europe the governing requirement is EN 13480-2 for industrial piping and
-EN 13445-2 for pressure vessels, both under the Pressure Equipment Directive
-2014/68/EU. They set the impact testing a steel needs for its design minimum
-temperature, and for ordinary carbon steel that boundary sits around -29 C,
-which is also the ASME B31.3 exemption limit quoted in American practice.
-Below it the steel loses toughness and can fail in a brittle manner without
-warning. Joule-Thomson
+-29 C is the ASME B31.3 figure: Table A-1 gives it as the design minimum
+temperature for A216 WCB without impact testing. That is the number this
+module screens on, and it is an American one.
+
+**EN does not work the same way and does not have a -29 C boundary.**
+EN 13480-2 Annex B, for industrial piping under PED 2014/68/EU, sets its
+threshold at **-10 C**: below that the low temperature material methods apply,
+and the impact test temperature then follows from Method 1 or Method 2 and
+varies with reference thickness, material group and stress. EN 13445-2 does
+the equivalent for pressure vessels. So a European job cannot be cleared by
+this screening alone; it tells you a grade is excluded, never that one is
+approved. Joule-Thomson
 cooling on a gas letdown routinely lands below that line while the inlet is
 at a comfortable ambient temperature, which is exactly the case an engineer
 is most likely to miss.
@@ -36,7 +41,8 @@ is most likely to miss.
 Sources
 -------
 EN 10213 for the European cast steel grades, which is the primary reference
-here. ASTM A216, A217, A351 and A352 for the American equivalents, given
+for the castings. One row, A352 LC9 / X8Ni9, is an EN 10028-4 plate grade
+given as an equivalence because EN 10213 has no direct counterpart. ASTM A216, A217, A351 and A352 for the American equivalents, given
 alongside because datasheets cross borders. EN 13480-2 and EN 13445-2 for the
 low temperature requirement under PED 2014/68/EU, with ASME B31.3 Table
 323.2.2 as the American counterpart.
@@ -73,10 +79,14 @@ MATERIALS: tuple[Material, ...] = (
              'impact tested carbon steel, the first step down from WCB'),
     Material('A352 LCC', '1.6220', 'G20Mn5+QT', -46, 343, 'low temperature carbon steel',
              'higher strength than LCB, same temperature floor'),
-    Material('A352 LC3', '1.5638', 'G9Ni10', -101, 343, 'nickel steel',
-             '3.5 percent nickel, for deep cold service'),
+    Material('A352 LC3', '1.5638', 'G9Ni14', -101, 343, 'nickel steel',
+             '3.5 percent nickel, for deep cold service. EN 10213 lists '
+             '1.5638 as G9Ni14; 1.5636 G9Ni10 is the lower nickel grade '
+             'and is roughly LC2, good to about -73 C'),
     Material('A352 LC9', '1.5662', 'X8Ni9', -196, 100, 'nickel steel',
-             '9 percent nickel, LNG and cryogenic service'),
+             '9 percent nickel, LNG and cryogenic service. X8Ni9 is an '
+             'EN 10028-4 PLATE grade, not an EN 10213 casting, so this '
+             'row is an equivalence rather than a like for like casting'),
     Material('A351 CF8', '1.4308', 'GX5CrNi19-10', -196, 538, 'austenitic stainless',
              'cast 304. No low temperature limit of practical concern'),
     Material('A351 CF8M', '1.4408', 'GX5CrNiMo19-11-2', -196, 538, 'austenitic stainless',
@@ -87,8 +97,11 @@ MATERIALS: tuple[Material, ...] = (
              '1.25Cr 0.5Mo, for elevated temperature service'),
     Material('A217 WC9', '1.7379', 'G17CrMo9-10', -29, 570, 'chrome moly',
              '2.25Cr 1Mo, higher temperature than WC6'),
-    Material('A217 C5', '1.7363', 'G12MoCrV5-2', -29, 650, 'chrome moly',
-             '5Cr 0.5Mo, high temperature and some sulphur resistance'),
+    Material('A217 C5', '1.7365', 'GX15CrMo5', -29, 650, 'chrome moly',
+             '5Cr 0.5Mo, high temperature and some sulphur resistance. '
+             'The nearest EN 10213 grade. 1.7363 was an older DIN number '
+             'for GX12CrMo5 and 1.7720 G12MoCrV5-2 is a different '
+             'vanadium bearing steel; both were previously here'),
 )
 
 CARBON_STEEL_FLOOR_C = -29.0
@@ -162,8 +175,9 @@ def screen_materials(
     if low < CARBON_STEEL_FLOOR_C:
         headline = (
             f'Coldest metal temperature approximately {low:.0f} C, below the '
-            f'{CARBON_STEEL_FLOOR_C:.0f} C impact test boundary of EN 13480-2 '
-            f'and ASME B31.3. '
+            f'{CARBON_STEEL_FLOOR_C:.0f} C ASME B31.3 design minimum for carbon '
+            f'steel without impact testing. Under EN 13480-2 the threshold is '
+            f'-10 C and the test temperature follows from Annex B. '
             f'Ordinary carbon steel is excluded.'
         )
     elif high > 425:

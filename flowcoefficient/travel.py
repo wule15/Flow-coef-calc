@@ -13,11 +13,21 @@ What this module does
 Given a valve style, its rated coefficient and its bore, it locates the
 operating point on the published curve and reads FL and xT off it.
 
-    Cv / d^2   with Cv the coefficient at that travel and d the bore in inches
+    Cv / d^2   with Cv the coefficient at that travel and d the valve INLET
+               diameter in inches
 
-Confirmed against the catalogue: a DN25 valve of rated Cv 12 tabulates a
-maximum Cv/d-squared of 12.0, so the abscissa is Cv over the bore in inches
-squared and nothing else.
+The catalogue states this in words: "Cv/d2 = Cv divided by the square of the
+valve inlet diameter d in inches". The DN25 anchor agrees independently, its
+full trim column ending at Cv 12 with the Cv/d2 row ending at 12.0.
+
+**Inlet diameter, not bore.** For a reduced bore valve those differ and this
+lookup would land in the wrong place. The parameter is still named
+valve_diameter_mm; pass the nominal inlet size.
+
+The curves are also described by the catalogue as the AVERAGE relation across
+sizes at ten percent opening intervals, not a measurement on one valve. On the
+ball page the ninety percent point of 56.0 matches the 1.5 and 2 inch columns
+but not the 1 inch at 46.6 or the 12 inch at 72.6.
 
 Default behaviour
 -----------------
@@ -127,13 +137,13 @@ CURVES: dict[str, TravelCurve] = {
         # equal percentage trim on the facing page prints the identical
         # numbers. It is measured behaviour, not a transcription error.
         xt=(0.69, 0.69, 0.72, 0.63, 0.61, 0.62, 0.65, 0.69, 0.71, 0.70),
-        source=f'{_VALMET}, rotary globe with linear trim',
+        source=f'{_VALMET}, ROTARY globe with linear trim, not a sliding stem globe',
     ),
     'globe cage': TravelCurve(
         cv_over_d2=(0.18, 0.36, 0.55, 0.98, 1.68, 2.35, 2.98, 3.81, 4.66, 8.89),
         fl=(0.97, 0.97, 0.97, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95),
         xt=(0.75, 0.75, 0.75, 0.75, 0.73, 0.71, 0.74, 0.74, 0.75, 0.75),
-        source=f'{_VALMET}, rotary globe with balanced trim',
+        source=f'{_VALMET}, ROTARY globe with balanced trim, not a cage guided sliding stem globe',
     ),
     'angle': TravelCurve(
         cv_over_d2=(1.12, 2.26, 3.29, 4.53, 5.81, 7.38, 9.44, 11.44, 13.44, 15.0),

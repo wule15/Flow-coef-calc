@@ -23,8 +23,24 @@ coefficient smaller than the duty requires, and the valve is undersized in
 service with nothing in the number to say so. It is why this function
 returns a result object carrying is_choked rather than a bare float.
 
-The N9 constant, and why it is derived here rather than quoted
---------------------------------------------------------------
+The numerical constant, and why it is called N7 not N9
+------------------------------------------------------
+**This equation uses relative density Gg, and in both IEC and ISA
+nomenclature the constant for that form is N7. N9 belongs to the molecular
+weight form.** The library called it N9 for several commits, which meant
+anyone checking against IEC Table 1 found the N9 row, read 2.46e3, and
+concluded the library was out by a factor of 5.4. The name is the error, not
+the value.
+
+Fisher Catalog 12 Table 2 tabulates N7 = 394 for Cv, bar, m3/h and K at
+normal conditions. As Kv that is 394 x 1.15606 = 455.5, against the 455.336
+derived below, 0.04 percent apart.
+
+A first principles derivation from N1 and the ideal gas law gives 456.7, so
+the tabulated figure is about 0.3 percent low against physics. That gap is in
+the published Cv column, not in this code, and 455.336 is the number an
+engineer checking a manufacturer table will expect.
+
 Unlike N1 on the liquid side, N9 is not 1 in this library's internal units,
 so it has to appear explicitly. A wrong N9 scales every gas answer by a
 constant factor and nothing else in the output looks wrong, which makes it
@@ -42,24 +58,18 @@ referenced to 0 degrees C, a standard cubic foot to 60 degrees F. The
 conversion below carries that temperature ratio explicitly. Using a 15
 degrees C reference instead moves the constant by about 5 percent.
 
-VERIFIED against the ISA/IEC equation constants table, 3 August 2026, as
-reproduced in Fisher Catalog 12 Section 2 Table 2. The standard tabulates
+A note on a cross-check that used to sit here and was withdrawn. It converted
+the tabulated N9 = 21.2 through the molecular weight form and arrived at
+455.36, calling that an independent confirmation. It was not: 2120 divided by
+sqrt(28.96546) is 393.9, which is the same tabulated N7 = 394 the imperial
+1360 already encodes. It was one number agreeing with itself while reading as
+verification, which is worse than no cross-check. The genuine outside checks
+are the Fisher N7 row above and the first principles derivation.
 
-    N9 = 21.2   Q in m3/h at normal conditions, p in kPa, T in K, C as Cv
-
-for the IEC form of the equation, which uses **molecular weight M** where
-this library uses relative density Gg. Converting:
-
-    21.2 (kPa, Cv)  x100      = 2120   (bar, Cv)
-    2120            x1.156    = 2450.7 (bar, Kv)
-    2450.7 / sqrt(28.96546)   = 455.36 (bar, Kv, Gg form)
-
-against 455.336 derived here, a difference of 0.005 percent. Two further
-agreements from the same table confirm the working rather than one number
-happening to land: N1 tabulates as 0.865 for Cv, which is 1.000 for Kv and
-matches the liquid module, and the ratio of the standard to normal condition
-constants, 22.4/21.2 = 1.0566, matches 288.65/273.15 = 1.0567, confirming the
-reference temperature handling.
+The reference temperature handling is confirmed separately and does hold: the
+ratio of the standard to normal condition constants, 22.4/21.2 = 1.0566,
+matches 288.65/273.15 = 1.0567. Fisher lists standard conditions as 15.5 C,
+which is the 288.65 K used here.
 
 The derivation is kept rather than replaced by the tabulated number, because
 the working is what makes the constant checkable.
@@ -99,8 +109,9 @@ _IMPERIAL_GAS_CONSTANT = 1360.0
 # ratio times the volume conversion.
 NM3_TO_SCF = (288.706 / 273.15) * 35.31467
 
-# Q[Nm3/h], p1[bar absolute], T[K], coefficient expressed as Kv.
-N9 = (
+# Q[Nm3/h], p1[bar absolute], T[K], coefficient expressed as Kv, relative
+# density form. This is IEC/ISA's N7. See the module docstring.
+N7 = (
     _IMPERIAL_GAS_CONSTANT
     * 1.156                 # Cv per Kv
     * 14.5037738            # psi per bar
@@ -327,7 +338,7 @@ def gas_flow_coefficient(
 
 
 
-    kv_bare = q / (N9 * p1 * y * math.sqrt(
+    kv_bare = q / (N7 * p1 * y * math.sqrt(
         x_effective / (relative_density * temperature_k * compressibility)))
 
     # Fp applies to gas exactly as it does to liquid. Computed before the
@@ -369,7 +380,7 @@ def gas_flow_coefficient(
             x_effective = min(x, limiting_ratio)
             is_choked = x >= limiting_ratio
             y = 1.0 - x_effective / (3.0 * fg * xt_value)
-            kv_bare = q / (N9 * p1 * y * math.sqrt(
+            kv_bare = q / (N7 * p1 * y * math.sqrt(
                 x_effective / (relative_density * temperature_k * compressibility)))
             if abs(kv_bare - previous) <= CONVERGENCE_TOLERANCE * max(kv_bare, 1e-12):
                 break
@@ -468,3 +479,7 @@ def gas_flow_coefficient(
         velocity=outlet_velocity,
         opening=check_opening(kv, rated_kv),
     )
+
+
+# Retained so existing imports keep working. N7 is the correct name.
+N9 = N7

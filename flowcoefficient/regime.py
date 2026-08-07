@@ -40,7 +40,10 @@ from dataclasses import dataclass
 
 from .errors import InvalidFluidPropertyError
 
-# IEC 60534-2-1 Table 1. Q in m3/h, kinematic viscosity in mm2/s, C as Kv.
+# IEC 60534-2-1 Table 1. Q in m3/h, C as Kv. The standard tabulates this as
+# 7.07e-2 with viscosity in m2/s; this library takes centistokes, so the
+# figure is a million times larger. A reader checking Table 1 sees 7.07e-2
+# and should not panic.
 N4 = 7.07e4
 
 # IEC 60534-2-1 Table 1. D in mm, C as Kv. Imported from the piping module so
