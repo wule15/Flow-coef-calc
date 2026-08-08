@@ -1,5 +1,5 @@
 """
-Compressible gas and vapour sizing. IEC 60534-2-1 clause 8.
+Compressible gas and vapour sizing. EN IEC 60534-2-1:2011 clause 7.
 
     x     = ( p1 - p2 ) / p1
     Fg    = gamma / 1.40
@@ -120,7 +120,7 @@ N7 = (
 )
 
 # xT is measured on air, whose ratio of specific heats is 1.40. Fg corrects
-# it to another gas. IEC 60534-2-1 clause 8.5.
+# it to another gas. EN IEC 60534-2-1:2011 clause 7.3, specific heat ratio factor.
 GAMMA_AIR = 1.40
 
 # The limiting expansion factor at and beyond choked flow.
@@ -217,7 +217,7 @@ def gas_flow_coefficient(
     atmospheric_pressure_bar: float = STANDARD_ATMOSPHERE_BAR,
 ) -> GasSizingResult:
     """
-    Flow coefficient for a gas or vapour. IEC 60534-2-1 clause 8.
+    Flow coefficient for a gas or vapour. EN IEC 60534-2-1:2011 clause 7.
 
     Flow is volumetric at normal conditions, 0 degrees C and 101.325 kPa.
 
@@ -373,7 +373,7 @@ def gas_flow_coefficient(
     #
     # The lookup uses the Fp-corrected coefficient, because that is what the
     # valve actually has to deliver and therefore what sets its travel.
-    # IEC 60534-2-1 clause 5: C = Q / (N1 Fp sqrt(dP/rho)).
+    # EN IEC 60534-2-1:2011 clause 6.1: C = Q / (N1 Fp sqrt(dP/rho)).
     operating_point = NOT_LOCATED
     passes = 0
     converged = True

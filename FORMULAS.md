@@ -26,7 +26,7 @@ The original text follows unchanged.
 Nothing is implemented yet. This document exists so the physics is checked
 before any code is written, which is the order the brief sets.
 
-Source standard throughout: **IEC 60534-2-1**, *Industrial-process control
+Source standard throughout: **EN IEC 60534-2-1:2011**, *Industrial-process control
 valves, Part 2-1: Flow capacity, Sizing equations for fluid flow under
 installed conditions*. Clause numbers are given where the equation maps to
 one cleanly, and marked as such where the mapping is looser.
@@ -73,7 +73,7 @@ precise pair. Tell me if your practice uses different rounding.
 
 ## 2. Liquid flow, non-choked
 
-IEC 60534-2-1, clause 7.1, turbulent non-choked flow.
+EN IEC 60534-2-1:2011, clause 6.1, turbulent non-choked flow.
 
 ```
               /  rho1 / rho0
@@ -118,7 +118,7 @@ which is Cv 20.4. A DN50 globe valve, which is a realistic answer.
 
 ## 3. Liquid flow, choked
 
-IEC 60534-2-1, clause 7.2 and 7.3.
+EN IEC 60534-2-1:2011, clause 6.2.2 and 6.2.3.
 
 Liquid chokes when the pressure drop is large enough that the fluid
 flashes or cavitates at the vena contracta. Beyond that point, increasing
@@ -137,7 +137,7 @@ and the pressure drop used in the sizing equation is then capped at
 dP_max = FL^2 x ( p1 - FF x pv )
 ```
 
-Liquid critical pressure ratio factor, clause 7.3:
+Liquid critical pressure ratio factor, clause 6.2.3:
 
 ```
 FF = 0.96 - 0.28 x sqrt( pv / pc )
@@ -163,7 +163,7 @@ defaulted for water (221.2 bar a) or always required?
 
 ## 4. Gas and vapour flow
 
-IEC 60534-2-1, clause 8.
+EN IEC 60534-2-1:2011, clause 7.
 
 ```
                         /       x
@@ -177,13 +177,13 @@ Pressure differential ratio:
 x = ( p1 - p2 ) / p1
 ```
 
-Expansion factor, clause 8.2:
+Expansion factor, clause 7.4:
 
 ```
 Y = 1 - x / ( 3 x Fgamma x xT )
 ```
 
-Specific heat ratio factor, clause 8.5:
+Specific heat ratio factor, clause 7.3:
 
 ```
 Fgamma = gamma / 1.40
@@ -436,7 +436,7 @@ not.
 That is why FL cannot be defaulted honestly. Using 0.9 on a butterfly valve
 tells you the valve is fine when it is eroding.
 
-**Where the number comes from.** Measured by flow test to IEC 60534-2-3 and
+**Where the number comes from.** Measured by flow test to EN IEC 60534-2-3 and
 published by the manufacturer, usually per valve size and per travel
 position. It is a property of that valve, not of your process.
 
@@ -517,7 +517,7 @@ each one is traceable to a source.
 ## Scope, and the line that keeps this bounded
 
 **This is not a thermophysical property library.** It is the properties the
-IEC 60534 sizing equations need, for common industrial fluids, cited, with
+EN IEC 60534 sizing equations need, for common industrial fluids, cited, with
 stated validity ranges.
 
 That framing matters. A general property library is a far larger project,

@@ -1,5 +1,6 @@
 """
-Flow regime screening. IEC 60534-2-1 clause 6.
+Flow regime screening. EN IEC 60534-2-1:2011 clause 9 (valve Reynolds
+number) and 6.3 / 7.6 (non-turbulent flow).
 
 Every sizing equation in this library assumes fully developed turbulent
 flow. That assumption is true for water, air and gas in almost any normal
@@ -18,7 +19,8 @@ returns a turbulent answer for hot bitumen has told you nothing about the
 
 The screening equation
 ----------------------
-IEC 60534-2-1 gives the valve Reynolds number as
+EN IEC 60534-2-1:2011 clause 9, Equation (23), gives the valve Reynolds
+number as
 
     Rev = N4 * Fd * Q / ( nu * sqrt(C * FL) )
           * ( (FL^2 * C^2) / (N2 * D^4) + 1 ) ^ 0.25
@@ -40,13 +42,13 @@ from dataclasses import dataclass
 
 from .errors import InvalidFluidPropertyError
 
-# IEC 60534-2-1 Table 1. Q in m3/h, C as Kv. The standard tabulates this as
+# EN IEC 60534-2-1:2011 Table 1. Q in m3/h, C as Kv. The standard tabulates this as
 # 7.07e-2 with viscosity in m2/s; this library takes centistokes, so the
 # figure is a million times larger. A reader checking Table 1 sees 7.07e-2
 # and should not panic.
 N4 = 7.07e4
 
-# IEC 60534-2-1 Table 1. D in mm, C as Kv. Imported from the piping module so
+# EN IEC 60534-2-1:2011 Table 1. D in mm, C as Kv. Imported from the piping module so
 # there is one value rather than two that can drift apart. The 1.60e-3 that
 # used to sit here was correct; it was briefly replaced with 0.00286, which
 # was not. See the derivation in piping.py.
@@ -137,17 +139,18 @@ def screen(
         correction = True
         note = (
             'Laminar. The turbulent sizing equations do not describe this flow '
-            'and the coefficient above is not trustworthy. IEC 60534-2-1 '
-            'clause 6 gives the Reynolds factor FR, which this library does '
-            'not implement.'
+            'and the coefficient above is not trustworthy. EN IEC '
+            '60534-2-1:2011 Annex A gives the Reynolds factor FR, which this '
+            'library does not yet implement.'
         )
     else:
         regime = 'transitional'
         correction = True
         note = (
             'Transitional. The turbulent sizing equations are losing accuracy '
-            'and the error grows as Rev falls. IEC 60534-2-1 clause 6 gives '
-            'the Reynolds factor FR, which this library does not implement.'
+            'and the error grows as Rev falls. EN IEC 60534-2-1:2011 Annex A '
+            'gives the Reynolds factor FR, which this library does not yet '
+            'implement.'
         )
 
     if not used_diameter:

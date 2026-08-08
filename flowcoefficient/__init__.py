@@ -1,5 +1,5 @@
 """
-Valve flow coefficient calculation to IEC 60534-2-1.
+Valve flow coefficient calculation to EN IEC 60534-2-1:2011.
 
 Kv and Cv conversion, incompressible liquid sizing, compressible gas sizing
 including the choked flow condition, unit conversion, and a small table of

@@ -2,9 +2,21 @@
 
 Status: PROPOSAL. Nothing here is implemented. Verify the physics before I write code.
 
-Source: ANSI/ISA-75.01.01-2002 (IEC 60534-2-1 Mod), clause 8.2 and Annex G.
-Cross-checked against the standard's own worked example (clause example, valve
-sized in Cv), where I reproduced FR = 0.715 by hand from Eq. G.3a.
+Source: EN IEC 60534-2-1:2011 (Edition 2), Annex A (normative), "Sizing
+equations for non-turbulent flow", Equations A.1 to A.8. This is the current
+edition and the one to cite. There is no later revision.
+
+The FR method was ALSO read from ANSI/ISA-75.01.01-2002 (based on IEC's 1998
+first edition), where it sits in clause 8.2 and Annex G. Edition 2 restructured
+the presentation (one intermediate variable n instead of n1/n2, an explicit Min
+function, and a new non-turbulent gas expansion factor), but the FR equations
+themselves are MATHEMATICALLY IDENTICAL between the two editions. This was
+confirmed by rendering and reading both. So the hand-check below still holds.
+
+All equations below were read from RENDERED pages of both editions (page
+images, not the flattened text layer), so superscripts, fraction bars and
+radicals are as printed. Cross-checked against the 1998-edition worked example,
+where FR = 0.715 reproduces by hand.
 
 ---
 
@@ -31,39 +43,60 @@ valves.py.
 
 ## 3. The split: full-size vs reduced trim
 
-Decided by Ci/d^2 at the operating point (d in mm, Ci as Kv):
+The 2011 edition classifies trim by the RATED coefficient, not the operating
+one (Annex A, A.8a/A.8b), which matters: it is a fixed property of the valve,
+so the branch cannot flip mid-iteration. d in mm, Crated as Kv:
 
-    Ci/d^2 >= 0.016   ->  full-size trim   (Eq. G.1a / G.2)
-    Ci/d^2 <  0.016   ->  reduced trim     (Eq. G.3a / G.4)
+    Crated / (d^2 * N18) >= 0.016   ->  full-size trim   (Eq. A.8a)
+    Crated / (d^2 * N18) <  0.016   ->  reduced trim     (Eq. A.8b)
 
-The 0.016 is 0.016 * N18 with N18 = 1.00 for Kv (Table 1, confirmed in the
-worked example). NOTE 3 of Annex G: Ci/d^2 must not exceed 0.04 for Kv; past
-that the FR curves are not valid.
+N18 = 8.65e-1 = 0.865 for Kv (Table 1, read off the rendered page). The 1998
+worked example's N18 = 1.00 is the Cv value, not the Kv value; this is a
+Kv-vs-Cv column swap of exactly the kind that produced the old N9 error, caught
+only by reading the actual table. Restriction A.4(3) gives the validity cap:
+C / (N18 * d^2) <= 0.047, which for Kv (N18 = 0.865) is C/d^2 <= 0.04.
 
-## 4. The FR equations (Annex G), in Kv units
+## 4. The FR equations (EN IEC 60534-2-1:2011, Annex A), in Kv units
 
-FULL-SIZE TRIM, Rev >= 10:
+n depends on trim style. C here is the coefficient being solved for:
 
-    n1 = N2 / (Ci/d^2)^2                                       (Eq. G.1b)
+    full-size trim:  n = N2 / (C/d^2)^2                        (Eq. A.8a)
+    reduced trim:    n = 1 + N32 * (C/d^2)^(2/3)               (Eq. A.8b)
 
-    transitional (G.1a):  FR = 1 + ( 0.33 * sqrt(FL) / n1^(1/4) ) * log10(Rev/10000)
-    laminar      (G.2):   FR = (0.026 / FL) * sqrt(n1 * Rev)          capped at 1
+LAMINAR, Rev < 10 (Eq. A.6):
 
-    Use the LOWER of the two. If Rev < 10, use G.2 only.
+    FR = Min[ (0.026 / FL) * sqrt(n * Rev) ,  1.00 ]
 
-REDUCED TRIM, Rev >= 10:
+TRANSITIONAL, Rev >= 10 (Eq. A.7):
 
-    n2 = 1 + N32 * (Ci/d^2)^(2/3)                              (Eq. G.3b)
+    FR = Min[ 1 + ( 0.33 * sqrt(FL) / n^(1/4) ) * log10(Rev/10000) ,
+              (0.026 / FL) * sqrt(n * Rev) ,
+              1.00 ]
 
-    transitional (G.3a):  FR = 1 + ( 0.33 * sqrt(FL) / n2^(1/4) ) * log10(Rev/10000)
-    laminar      (G.4):   FR = (0.026 / FL) * sqrt(n2 * Rev)          capped at 1
+This is the same math as the 1998 Annex G (G.1a/G.2 for full trim, G.3a/G.4 for
+reduced), reorganised into a single n and an explicit Min. The FR = 0.715
+worked-example check was done against that identical form.
 
-    Use the LOWER of the two. If Rev < 10, use G.4 only.
+Two new constants, both read off the rendered Table 1:
+- N32 = 1.40e2 = 140 for Kv (Cv column is 127, which reproduces the worked
+  example's n = 1.235).
+- N18 = 8.65e-1 = 0.865 for Kv, used only in the trim-classification boundary.
+  The 1.00 in the worked example is the Cv value. Getting this wrong is the
+  Kv-vs-Cv column swap that produced the old N9 error.
 
-The one new constant: N32 = 1.40e2 = 140 for Kv (Table 1). The worked example
-uses the Cv value 127; I confirmed 127 reproduces its n2 = 1.235, and 140 is
-the Kv column of the same row. N18 = 1.00 also new but only as the 0.016 and
-0.04 thresholds.
+## 4a. Gas non-turbulent flow needs its own Y (new in 2011)
+
+The 2011 edition adds an expansion factor for non-turbulent compressible flow
+(Annex A, Eq. A.5) that the 1998 edition did not have. It blends toward the
+turbulent Y as Rev rises:
+
+    Rev >= 1000:  Y = (Rev - 1000)/9000 * ( 1 - x_sizing/(3*x_choked) - sqrt(1 - x/2) )
+                      + sqrt(1 - x/2)
+    Rev <  1000:  Y = sqrt(1 - x/2)
+
+The gas non-turbulent model is W = C*N27*FR*Y*sqrt(dp*(p1+p2)*M/T1) (Eq. A.3),
+or the Qs form with N22 (Eq. A.4). Implement the liquid FR path first, then the
+gas path with this Y. N22 and N27 need adding, verified against Table 1.
 
 ## 5. The iteration
 
@@ -79,18 +112,18 @@ from above, is not conservative-by-rounding, and matches how the library
 already iterates the operating point. It reports pass count and whether it
 converged, same as the existing loops.
 
-DECISION FOR YOU: fixed-point to tolerance (my recommendation, more accurate),
-or the standard's literal 30-percent-step method (conservative, matches a hand
-calculation exactly). I will implement whichever you want and cite it.
+DECISION (made): fixed-point to tolerance, matching the existing operating-point
+loop. The standard's literal 30-percent-step method was the alternative.
 
 ## 6. Acceptance test, from the standard
 
-The worked example (segmented ball, Cv basis) gives a check I will encode:
+The 1998-edition worked example (segmented ball, Cv basis) gives a check I will
+encode:
 
-    FL = 0.98, Ci/d^2 small (reduced trim), Rev = 1202, n2 = 1.235
-    G.3a -> FR = 0.715
-    G.4  -> FR = 1.022 (capped to 1)
-    use FR = 0.715
+    FL = 0.98, C/d^2 small (reduced trim), Rev = 1202, n = 1.235
+    transitional (A.7 / old G.3a) -> FR = 0.715
+    laminar      (A.6 / old G.4)  -> FR = 1.022, capped to 1
+    Min -> FR = 0.715
 
 I reproduced 0.715 by hand. The Kv version of this case becomes a unit test, so
 the implementation is pinned to the standard's own number, not to itself. This
@@ -100,33 +133,37 @@ is the outside-source check this codebase has learned to require.
 
 liquid.py already has the turbulent coefficient, FL, Fd, rated_kv and d, and
 already calls screen(). FR slots in right after the coefficient settles: screen,
-and if correction_needed, run the FR iteration and divide. The result object
-gains an FR field and its provenance string. Gas (clause 7.2) uses the same FR
-from Annex G; I propose liquid first, then gas in the same shape.
+and if correction_needed, run the FR iteration and divide (Eq. A.2). The result
+object gains an FR field and its provenance string. The gas path (main-body
+clause 7.6, Annex A) uses the same FR plus the non-turbulent Y of Eq. A.5. Do
+liquid first, then gas in the same shape.
 
-## 8. Three weakest parts of this plan
+## 8. Weakest parts of this plan
 
-1. Annex G is informative, not normative, and its NOTE 2 says the equations are
-   fitted at rated travel and "may not be fully accurate at lower valve
-   travels". The library reads FL and Fd off the travel curve at the operating
-   point, so at low opening the FR it computes inherits that stated inaccuracy.
-   It should say so rather than imply the curve equation is exact everywhere.
+1. Annex A is NORMATIVE in the 2011 edition (it was informative Annex G in
+   1998), but it still states the equations are fitted at rated travel and
+   "may not be fully accurate at lower valve travels". The library reads FL and
+   Fd off the travel curve at the operating point, so at low opening the FR it
+   computes inherits that stated inaccuracy. It should say so rather than imply
+   the curve equation is exact everywhere.
 
 2. Fd drives Rev and the library carries one Fd per style, catalogue-derived,
    not per-valve tested. IEC requires a type test for 5 percent accuracy on Fd.
    A wrong Fd moves Rev and therefore FR. This is the same single-manufacturer
    caveat the travel curves already carry, and the FR result should repeat it.
 
-3. The full-vs-reduced split and the 0.04 cap are evaluated on Ci, which moves
-   during the iteration. A duty that crosses the 0.016 boundary between passes
-   could oscillate between the G.1 and G.3 branches. I need to prove the
-   iteration is stable across that boundary, or fix the branch on the first
-   pass and note it. Convergence must be swept, as it was for the operating
-   point.
+3. RESOLVED by moving to the 2011 edition. The full-vs-reduced split is
+   classified on Crated (the rated coefficient, fixed), not on the iterating C,
+   so the branch cannot oscillate. The 0.04 cap is a validity check, not a
+   branch. Convergence of the fixed-point loop still gets swept, as the
+   operating-point loop was.
 
 ## Sources
 
-- ANSI/ISA-75.01.01-2002 (IEC 60534-2-1 Mod), clause 8.2 (Eq. 28, 29),
-  Annex G (Eq. G.1a, G.1b, G.2, G.3a, G.3b, G.4), Table 1 (N2, N4, N18, N32),
-  Table 2 and Annex A (Fd).
-- Worked example in the standard, segmented ball valve, giving FR = 0.715.
+- EN IEC 60534-2-1:2011 (Edition 2), Annex A (normative), Eq. A.1 (Rev),
+  A.2-A.4 (non-turbulent models), A.5 (non-turbulent gas Y), A.6/A.7 (FR),
+  A.8a/A.8b (n by trim). Read from rendered pages.
+- ANSI/ISA-75.01.01-2002 (IEC 60534-2-1 Mod, 1998 basis), clause 8.2 and
+  Annex G, read from rendered pages as a cross-check. FR equations identical.
+- Table 1 for N2, N4, N18, N32 (and N22, N27 for the gas path), read from the
+  rendered table. Worked example (segmented ball) giving FR = 0.715.

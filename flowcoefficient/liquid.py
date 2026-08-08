@@ -1,7 +1,8 @@
 """
-Incompressible liquid sizing. IEC 60534-2-1 clauses 7.1 to 7.3.
+Incompressible liquid sizing. EN IEC 60534-2-1:2011 clause 6 (6.1 turbulent
+flow, 6.2 pressure differentials, 6.2.3 FF).
 
-Non-choked turbulent flow, clause 7.1:
+Non-choked turbulent flow, clause 6.1:
 
     C = Q / sqrt( dP / (rho1 / rho0) )
 
@@ -140,7 +141,7 @@ def liquid_flow_coefficient(
     atmospheric_pressure_bar: float = STANDARD_ATMOSPHERE_BAR,
 ) -> LiquidSizingResult:
     """
-    Flow coefficient for a liquid. IEC 60534-2-1 clause 7.
+    Flow coefficient for a liquid. EN IEC 60534-2-1:2011 clause 6.
 
     pressure_basis is required and has no default. Assuming the wrong basis
     is the error most likely to produce a confident wrong answer, and stating
@@ -309,7 +310,7 @@ def liquid_flow_coefficient(
 
     # Fp and FLP together. FLP/Fp replaces FL in the choked test below,
     # because a valve between reducers chokes at a lower pressure drop than
-    # the bare valve does. IEC 60534-2-1 clause 5.
+    # the bare valve does. EN IEC 60534-2-1:2011 clause 8.
     piping = piping_geometry_factor(
         rated_kv=rated_kv,
         valve_diameter_mm=valve_diameter_mm,

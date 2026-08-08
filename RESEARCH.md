@@ -19,7 +19,7 @@ vapour-liquid and gas-solid mixtures. That is not an omission in the library.
 It is the boundary of the standard.
 
 So anyone sizing a flashing line, a wet gas, a slurry or a cryogenic
-two-phase service is outside IEC 60534-2-1 entirely, and into proprietary
+two-phase service is outside EN IEC 60534-2-1:2011 entirely, and into proprietary
 methods and engineering judgement.
 
 ### What practice actually does
@@ -64,7 +64,7 @@ says nothing about the fact that what leaves the valve is a two-phase
 mixture.
 
 A `flashing=True` flag with a note saying the outlet is below vapour
-pressure, that the service is two-phase, that IEC 60534-2-1 does not cover
+pressure, that the service is two-phase, that EN IEC 60534-2-1:2011 does not cover
 it, and that a HEM-based package should be used, is about forty lines and is
 honest. It is the same rule as everywhere else: report the condition, refuse
 to guess the number.
@@ -120,7 +120,7 @@ reports the index and says it has no threshold to judge it against.
 
 ## 3. Noise
 
-**IEC 60534-8-3** covers aerodynamic noise prediction, and **60534-8-4**
+**EN IEC 60534-8-3** covers aerodynamic noise prediction, and **60534-8-4**
 hydrodynamic. I found the standards but not their content.
 
 This is a substantial calculation, an octave-band sound power model, not a
@@ -139,7 +139,7 @@ The travel curve work today added nine geometries. What is still missing, in
 order of how often you would meet it:
 
 **Multistage and multipath trim.** Anti-cavitation and low-noise trims that
-take the pressure drop in stages. IEC 60534-2-1 Annex B covers these and it
+take the pressure drop in stages. EN IEC 60534-2-1:2011 Annex B covers these and it
 is a genuinely different equation, not a coefficient adjustment. Worth doing
 eventually because it is the standard answer to a cavitating or noisy
 service, so the library currently detects a problem it cannot then help you
@@ -158,7 +158,7 @@ rotary plug curve, which is honest in the docstring but is a substitute.
 
 ## 5. Other flow criteria found while looking
 
-**Reynolds factor FR**, IEC clause 6. Still the largest genuine gap. Screened
+**Reynolds factor FR**, EN IEC 60534-2-1:2011 Annex A. Still the largest genuine gap. Screened
 and labelled, not corrected. Implicit, needs iteration.
 
 **Pressure recovery and the vena contracta.** Already handled through FL.

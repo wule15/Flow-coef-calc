@@ -44,7 +44,7 @@ print(result.opening)
 # required Kv 17.57 is 28 percent of rated 63
 ```
 
-**Liquid sizing**, IEC 60534-2-1 clause 7, with the choked flow check from clauses 7.2 and 7.3 using the liquid pressure recovery factor FL and the critical pressure ratio FF.
+**Liquid sizing**, EN IEC 60534-2-1:2011 clause 6, with the choked flow check from clauses 6.2.2 and 6.2.3 using the liquid pressure recovery factor FL and the critical pressure ratio FF.
 
 **Gas and vapour sizing**, clause 8, with the choked condition, the expansion factor Y, and the specific heat ratio correction.
 
@@ -245,7 +245,7 @@ The ones that matter are in `tests/test_standard_examples.py`, because they comp
 
 | | |
 |---|---|
-| EN IEC 60534-2-1 | Sizing equations for fluid flow under installed conditions. Clause 5 piping geometry, 6 flow regime, 7 liquid, 8 gas. Identical text to IEC 60534-2-1 |
+| EN IEC 60534-2-1:2011 | Sizing equations for fluid flow under installed conditions. Clause 6 liquid, 7 gas, 8 piping geometry, 9 Reynolds number, Annex A non-turbulent flow. Identical text to IEC 60534-2-1:2011 |
 | EN IEC 60534-2-3 | Flow capacity test procedures. Defines how FL and xT are measured. The values here are **not** taken from it |
 | EN 13480-2 | Metallic industrial piping, materials. Low temperature requirement under PED 2014/68/EU |
 | EN 13445-2 | Unfired pressure vessels, materials |

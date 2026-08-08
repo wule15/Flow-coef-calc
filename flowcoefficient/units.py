@@ -6,7 +6,7 @@ Everything arriving from outside is converted here, once, on entry.
 
 Why one internal unit system rather than a constants table
 ----------------------------------------------------------
-The IEC 60534 sizing equations carry a numerical constant, N, whose value
+The EN IEC 60534 sizing equations carry a numerical constant, N, whose value
 depends on the units the caller is working in. That constant is not physics,
 it is units bookkeeping, and the standard publishes a table of N values
 because the equation stays put while the units move.

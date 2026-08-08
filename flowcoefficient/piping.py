@@ -1,5 +1,5 @@
 """
-Piping geometry factor Fp. IEC 60534-2-1 clause 5.
+Piping geometry factor Fp. EN IEC 60534-2-1:2011 clause 8 (8.2 Fp, 8.3 FLP).
 
 Why it exists
 -------------
@@ -127,7 +127,7 @@ def piping_geometry_factor(
     fl: float | None = None,
 ) -> PipingGeometry:
     """
-    Fp for a valve between reducers. IEC 60534-2-1 clause 5.
+    Fp for a valve between reducers. EN IEC 60534-2-1:2011 clause 8.2.
 
     Returns NOT_APPLIED, with fp = 1.0, when any input is missing. The result
     says so rather than implying the valve is line size, on the same rule as
@@ -178,7 +178,7 @@ def piping_geometry_factor(
     fp = 1.0 / math.sqrt(1.0 + (sum_z / N2) * (rated_kv / d ** 2) ** 2)
 
     # FLP, the combined liquid pressure recovery factor for the assembly.
-    # IEC 60534-2-1 clause 5. Only the inlet fitting counts here, because
+    # EN IEC 60534-2-1:2011 clause 8.3. Only the inlet fitting counts here, because
     # choking is decided at the vena contracta, which is upstream of the
     # outlet increaser.
     #

@@ -80,7 +80,7 @@ class ValveStyle:
     placeholder the single fl and xt above really are.
     """
     """
-    Valve style modifier, IEC 60534-2-1 Annex A. Describes the shape of the
+    Valve style modifier, EN IEC 60534-2-1:2011 Annex A. Describes the shape of the
     flow passage and is used only in the Reynolds number screening. A single
     round orifice is 1.0; a parabolic plug splitting the flow is lower.
     """

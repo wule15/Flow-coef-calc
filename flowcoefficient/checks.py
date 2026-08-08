@@ -1,7 +1,7 @@
 """
 Practical checks that need a line size or a candidate valve.
 
-None of this is IEC 60534. The sizing equations answer "what coefficient
+None of this is EN IEC 60534. The sizing equations answer "what coefficient
 does this duty need". These answer "and is that a sensible thing to
 install", which is a different question and the one that actually decides
 whether a valve survives.

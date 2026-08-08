@@ -182,7 +182,7 @@ def _add_shared(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='flowcoeff',
-        description='Valve flow coefficient calculation to IEC 60534-2-1.',
+        description='Valve flow coefficient calculation to EN IEC 60534-2-1:2011.',
         epilog='Pressure basis is always required. Assuming it is the error '
                'most likely to produce a confident wrong answer.',
     )

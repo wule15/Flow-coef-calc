@@ -1,5 +1,5 @@
 """
-Fluid properties needed by the IEC 60534 sizing equations.
+Fluid properties needed by the EN IEC 60534 sizing equations.
 
 This is deliberately not a thermophysical property library. It holds five
 properties, for seven fluids, each cited, each with the range it is valid
@@ -320,7 +320,7 @@ def get_fluid(name: str) -> Fluid:
 def ff_critical_pressure_ratio(vapour_pressure_bar: float,
                                critical_pressure_bar: float) -> float:
     """
-    Liquid critical pressure ratio factor FF. IEC 60534-2-1 clause 7.3.
+    Liquid critical pressure ratio factor FF. EN IEC 60534-2-1:2011 clause 6.2.3.
 
         FF = 0.96 - 0.28 * sqrt(pv / pc)
 
