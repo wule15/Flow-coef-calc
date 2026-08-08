@@ -33,7 +33,7 @@ from .cavitation import NOT_COMPUTED as CAV_NOT_COMPUTED, CavitationIndex
 from .cavitation import evaluate as evaluate_cavitation
 from .coefficients import kv_to_cv
 from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
-                     InvalidPressureError, OutOfRangeError)
+                     InvalidPressureError, OutOfRangeError, require_finite)
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
@@ -158,6 +158,19 @@ def liquid_flow_coefficient(
     >>> round(r.kv, 2), round(r.cv, 2), r.choked_check_performed
     (17.68, 20.44, False)
     """
+    require_finite(
+        inlet_pressure=inlet_pressure, flow_rate=flow_rate,
+        outlet_pressure=outlet_pressure, pressure_drop=pressure_drop,
+        thermal_duty=thermal_duty, temperature_in=temperature_in,
+        temperature_out=temperature_out, specific_heat=specific_heat,
+        relative_density=relative_density, temperature=temperature, fl=fl,
+        vapour_pressure=vapour_pressure, critical_pressure=critical_pressure,
+        sigma_threshold=sigma_threshold, kinematic_viscosity=kinematic_viscosity,
+        valve_diameter_mm=valve_diameter_mm, pipe_diameter_mm=pipe_diameter_mm,
+        rated_kv=rated_kv, downstream_diameter_mm=downstream_diameter_mm,
+        atmospheric_pressure_bar=atmospheric_pressure_bar,
+    )
+
     resolved = resolve_units(
         units,
         pressure=pressure_unit,
@@ -197,6 +210,16 @@ def liquid_flow_coefficient(
 
     # ── Fluid properties ────────────────────────────────────────────────────
     fluid_obj = get_fluid(fluid) if fluid else None
+    for label, supplied in (('temperature', temperature),
+                            ('temperature_in', temperature_in),
+                            ('temperature_out', temperature_out)):
+        if supplied is not None:
+            k = convert_temperature(supplied, resolved['temperature'], 'k')
+            if k <= 0:
+                raise InvalidFluidPropertyError(
+                    f'{label} is {k:.5g} K, at or below absolute zero, which '
+                    f'cannot describe a real fluid.'
+                )
     temperature_k = None
     if temperature is not None:
         temperature_k = convert_temperature(temperature, resolved['temperature'], 'k')

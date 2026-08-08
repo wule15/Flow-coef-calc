@@ -81,6 +81,19 @@ class TestItReportsWhatItDidNotCheck:
               '--basis', 'absolute', '--temp', '20', '--fluid', 'air'])
         assert 'NOT CHECKED' in capsys.readouterr().out
 
+    def test_skipped_choked_check_names_only_what_was_missing(self, capsys):
+        """
+        FL supplied but water above its Antoine range, so no vapour pressure.
+        The old line blamed 'no FL or vapour pressure' with FL sitting in the
+        output two rows up. It must name the vapour pressure and not FL.
+        """
+        main(['liquid', '--flow', '25', '--p1', '6', '--p2', '4',
+              '--basis', 'absolute', '--fluid', 'water', '--fl', '0.9',
+              '--temp', '120'])
+        out = capsys.readouterr().out
+        assert 'NOT CHECKED, missing a vapour pressure' in out
+        assert 'no FL' not in out
+
     def test_gas_without_xt_at_high_x_refuses_with_a_reason(self, capsys):
         code = main(['gas', '--flow', '500', '--p1', '7', '--p2', '5',
                      '--basis', 'absolute', '--temp', '20', '--fluid', 'air'])

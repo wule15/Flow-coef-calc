@@ -76,7 +76,13 @@ def _report_liquid(result) -> None:
                         f'{result.effective_pressure_drop_bar:.4g} bar '
                         f'of {result.pressure_drop_bar:.4g} available'))
     else:
-        print(_line('choked flow', 'NOT CHECKED, no FL or vapour pressure given'))
+        missing = []
+        if result.fl is None:
+            missing.append('FL')
+        if result.vapour_pressure_bar is None:
+            missing.append('a vapour pressure')
+        detail = ' and '.join(missing) if missing else 'a required input'
+        print(_line('choked flow', f'NOT CHECKED, missing {detail}'))
 
     if result.piping.checked:
         print(_line('Fp', str(result.piping)))

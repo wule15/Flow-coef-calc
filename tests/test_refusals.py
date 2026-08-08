@@ -24,6 +24,7 @@ from flowcoefficient import (  # noqa: E402
     InvalidFlowRateError,
     InvalidFluidPropertyError,
     InvalidPressureError,
+    NonFiniteInputError,
     OutOfRangeError,
     UnknownFluidError,
     UnknownUnitError,
@@ -105,6 +106,66 @@ class TestImpossibleFlowConditions:
             liquid_flow_coefficient(
                 inlet_pressure=6.0, outlet_pressure=4.0,
                 pressure_basis='absolute', relative_density=1.0)
+
+
+class TestNonFiniteInputsAreRefused:
+    """
+    nan and inf pass Python's float parsing and every sign and range test,
+    then either divide to a ZeroDivisionError deep in the correlations or
+    propagate to an inf or nan coefficient that reads like an answer. Found by
+    fuzzing the CLI: both faults reached the user as a bare traceback or an
+    'inf' in the report. They are refused at the door now.
+    """
+
+    def test_infinite_inlet_pressure(self):
+        with pytest.raises(NonFiniteInputError, match='inlet_pressure'):
+            liquid_flow_coefficient(
+                flow_rate=25, inlet_pressure=float('inf'), outlet_pressure=4.0,
+                pressure_basis='absolute', relative_density=1.0)
+
+    def test_nan_flow_rate(self):
+        with pytest.raises(NonFiniteInputError, match='flow_rate'):
+            liquid_flow_coefficient(
+                flow_rate=float('nan'), inlet_pressure=6.0, outlet_pressure=4.0,
+                pressure_basis='absolute', relative_density=1.0)
+
+    def test_infinite_gas_flow(self):
+        with pytest.raises(NonFiniteInputError):
+            gas_flow_coefficient(
+                flow_rate=float('inf'), inlet_pressure=7.0, outlet_pressure=5.0,
+                pressure_basis='absolute', temperature=20, fluid='air',
+                valve_style='globe')
+
+    def test_nan_compressibility(self):
+        with pytest.raises(NonFiniteInputError, match='compressibility'):
+            gas_flow_coefficient(
+                flow_rate=500, inlet_pressure=7.0, outlet_pressure=5.0,
+                pressure_basis='absolute', temperature=20, fluid='air',
+                valve_style='globe', compressibility=float('nan'))
+
+
+class TestAbsoluteZeroIsRefused:
+    """
+    The gas path already refused a temperature at or below absolute zero,
+    because it feeds the sizing equation directly. On the liquid path
+    temperature is optional and only feeds the vapour pressure, so a value
+    below absolute zero slipped through to a silent skip of the choked check.
+    Both paths refuse it now.
+    """
+
+    def test_liquid_temperature_below_absolute_zero(self):
+        with pytest.raises(InvalidFluidPropertyError, match='absolute zero'):
+            liquid_flow_coefficient(
+                flow_rate=25, inlet_pressure=6.0, outlet_pressure=4.0,
+                pressure_basis='absolute', fluid='water', fl=0.9,
+                temperature=-274)
+
+    def test_liquid_return_temperature_below_absolute_zero(self):
+        with pytest.raises(InvalidFluidPropertyError, match='absolute zero'):
+            liquid_flow_coefficient(
+                thermal_duty=250, temperature_in=10, temperature_out=-300,
+                inlet_pressure=6.0, outlet_pressure=4.0,
+                pressure_basis='absolute', fluid='water')
 
 
 class TestOutOfRangeInputs:

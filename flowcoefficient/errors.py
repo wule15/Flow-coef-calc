@@ -13,9 +13,44 @@ raised.
 
 from __future__ import annotations
 
+import math
+
 
 class FlowCoefficientError(Exception):
     """Base for everything this library raises. Catch this to catch all."""
+
+
+class NonFiniteInputError(FlowCoefficientError):
+    """
+    A numeric input that is infinite or not a number.
+
+    nan and inf pass Python's float parsing and every sign and range test,
+    then either divide to a ZeroDivisionError deep in the correlations or
+    propagate to an inf or nan flow coefficient that reads like an answer.
+    They cannot describe a real duty, so the library refuses them at the door.
+    """
+
+    def __init__(self, name: str, value: float) -> None:
+        self.name = name
+        self.value = value
+        super().__init__(
+            f"{name} is {value}, which is not a finite number. Every numeric "
+            f"input must be a real, finite value."
+        )
+
+
+def require_finite(**named: float | None) -> None:
+    """Reject any supplied numeric argument that is nan or infinite.
+
+    Arguments that are None are skipped, so this is safe to call with the
+    full set of optional parameters. Pass numeric arguments only; strings
+    and other types are the caller's responsibility.
+    """
+    for name, value in named.items():
+        if value is None:
+            continue
+        if not math.isfinite(value):
+            raise NonFiniteInputError(name, value)
 
 
 class UnknownUnitError(FlowCoefficientError):

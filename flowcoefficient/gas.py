@@ -83,7 +83,7 @@ from dataclasses import dataclass
 from .checks import (OpeningCheck, VELOCITY_NOT_CHECKED, VelocityCheck,
                      check_opening, check_velocity)
 from .coefficients import kv_to_cv
-from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError, OutOfRangeError
+from .errors import InvalidFlowRateError, InvalidFluidPropertyError, InvalidPressureError, OutOfRangeError, require_finite
 from .fluids import MOLAR_MASS_AIR, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .units import (
@@ -236,6 +236,16 @@ def gas_flow_coefficient(
     >>> round(r.pressure_drop_ratio, 4)
     0.2857
     """
+    require_finite(
+        flow_rate=flow_rate, inlet_pressure=inlet_pressure,
+        outlet_pressure=outlet_pressure, temperature=temperature,
+        relative_density=relative_density, gamma=gamma, xt=xt,
+        compressibility=compressibility, valve_diameter_mm=valve_diameter_mm,
+        pipe_diameter_mm=pipe_diameter_mm,
+        downstream_diameter_mm=downstream_diameter_mm, rated_kv=rated_kv,
+        atmospheric_pressure_bar=atmospheric_pressure_bar,
+    )
+
     resolved = resolve_units(
         units,
         pressure=pressure_unit,
