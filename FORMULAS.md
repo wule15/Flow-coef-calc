@@ -226,6 +226,56 @@ service. This is why I want the function returning a result object carrying
 
 ---
 
+## 4a. Non-turbulent flow, the Reynolds factor FR
+
+Source: EN IEC 60534-2-1:2011 Annex A (normative), Equations A.6, A.7, A.8.
+Implemented on the liquid path only. The gas path additionally needs the
+non-turbulent expansion factor Y of Eq. A.5, which is not implemented.
+
+Below Rev = 10 000 the turbulent equations overstate what the valve passes, so
+the required coefficient becomes `C_turbulent / FR`, FR <= 1 (Eq. A.2). Trim is
+classified on the RATED coefficient so the branch cannot flip mid-iteration
+(Eq. A.8):
+
+```
+Crated / (d^2 x N18) >= 0.016   ->  full-size trim
+Crated / (d^2 x N18) <  0.016   ->  reduced trim
+```
+
+The intermediate n, then FR (Eq. A.8, A.6, A.7):
+
+```
+full-size:      n = N2 / (C/d^2)^2
+reduced:        n = 1 + N32 x (C/d^2)^(2/3)
+
+laminar,   Rev < 10:   FR = Min[ (0.026/FL) x sqrt(n x Rev) , 1 ]
+transitional, Rev>=10: FR = Min[ 1 + (0.33 x sqrt(FL) / n^0.25) x log10(Rev/10000) ,
+                                 (0.026/FL) x sqrt(n x Rev) , 1 ]
+```
+
+| Symbol | Meaning | Value / unit |
+|---|---|---|
+| Rev | valve Reynolds number, from section on regime screening (Eq. 23) | dimensionless |
+| n | intermediate variable, Eq. A.8 | dimensionless |
+| FL | liquid pressure recovery factor | dimensionless |
+| N2 | numerical constant, D in mm, C as Kv | 1.60e-3 |
+| N18 | trim-classification constant, C as Kv | **0.865** (Cv column is 1.00) |
+| N32 | reduced-trim n constant, C as Kv | **140** (Cv column is 127) |
+
+FR depends on the coefficient through Rev, so it is solved by fixed point:
+`C_next = C_turbulent / FR(C)`, to the same tolerance the operating-point loop
+uses. The Kv constants differ from the Cv figures printed in the standard's
+worked example: N18 scales linearly (0.865 x 1.00 = 0.865), N32 by the 2/3
+power (127 / 0.865^(2/3) = 139.9), because C enters n to the 2/3 power. Using
+the Cv figure in a Kv library is the column swap that produced the old N9 error.
+
+**Pinned example.** The standard's segmented-ball case, FL = 0.98, Rev = 1202,
+n = 1.235, is transitional and gives FR = 0.715. The transitional term alone is
+0.71487; the laminar term is 1.022, capped to 1; the Min is 0.715. Reproduced
+in the test suite. Note it is the sqrt(FL) form: plain FL gives 0.718.
+
+---
+
 ## 5. Unit conversion
 
 No standard governs these, they are definitions.

@@ -1,6 +1,12 @@
 # FR (Reynolds number factor) implementation proposal
 
-Status: PROPOSAL. Nothing here is implemented. Verify the physics before I write code.
+Status: IMPLEMENTED on the liquid path (flowcoefficient/reynolds_factor.py),
+2026-08-10, after physics sign-off. The FR equation is pinned to the standard's
+FR = 0.715 worked example, and the Kv constants N18 = 0.865 and N32 = 140 are
+cross-checked against the Cv-basis figures by the unit conversion (linear for
+N18, the 2/3 power for N32). The GAS path is still NOT implemented: it needs the
+non-turbulent expansion factor Y of Eq. A.5 (section 4a below), which is the
+remaining gap. The physics record below is retained as the derivation.
 
 Source: EN IEC 60534-2-1:2011 (Edition 2), Annex A (normative), "Sizing
 equations for non-turbulent flow", Equations A.1 to A.8. This is the current

@@ -132,7 +132,7 @@ EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these. EN 
 
 ## What it does not do
 
-- **The Reynolds number factor FR is not implemented.** Viscous flow is screened and reported, not corrected. A transitional or laminar answer comes back labelled and should not be trusted as it stands.
+- **The Reynolds number factor FR is applied on the liquid path only, not the gas path.** A viscous liquid sizing is screened and then corrected: the result carries FR, the corrected Kv and its provenance (EN IEC 60534-2-1:2011 Annex A). A viscous gas sizing is still screened and reported but not corrected, because the compressible case also needs the non-turbulent expansion factor Y of Eq. A.5, which is not implemented. The FR correction also inherits the Annex A caveat that its curves are fitted at rated travel and lose accuracy at low opening.
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
 - Material screening is on temperature alone, and runs on the gas path only, since it exists to catch Joule-Thomson cooling. It excludes grades, it does not select one.
 - Liquid density is not corrected for temperature. The result says so when the flowing temperature is far from the tabulated one.

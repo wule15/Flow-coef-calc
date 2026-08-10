@@ -158,8 +158,10 @@ rotary plug curve, which is honest in the docstring but is a substitute.
 
 ## 5. Other flow criteria found while looking
 
-**Reynolds factor FR**, EN IEC 60534-2-1:2011 Annex A. Still the largest genuine gap. Screened
-and labelled, not corrected. Implicit, needs iteration.
+**Reynolds factor FR**, EN IEC 60534-2-1:2011 Annex A. Implemented on the liquid path
+(reynolds_factor.py), solved by fixed-point iteration and pinned to the standard's FR = 0.715
+worked example. The gas path still only screens and labels, because it also needs the
+non-turbulent expansion factor Y of Eq. A.5, which is the remaining gap here.
 
 **Pressure recovery and the vena contracta.** Already handled through FL.
 

@@ -38,6 +38,8 @@ from .errors import (InvalidFlowRateError, InvalidFluidPropertyError,
 from .fluids import WATER_DENSITY_15C, ff_critical_pressure_ratio, get_fluid
 from .piping import NOT_APPLIED as FP_NOT_APPLIED, PipingGeometry, piping_geometry_factor
 from .regime import FlowRegime, NOT_CHECKED, screen
+from .reynolds_factor import (NOT_APPLIED as FR_NOT_APPLIED, ReynoldsFactor,
+                              apply_reynolds_factor)
 from .travel import (CONVERGENCE_TOLERANCE, MAX_PASSES, NOT_LOCATED,
                      OperatingPoint, locate)
 from .thermal import flow_from_thermal_duty
@@ -73,6 +75,7 @@ class LiquidSizingResult:
     ff: float | None = None
     fluid: str | None = None
     flow_regime: FlowRegime = NOT_CHECKED
+    reynolds_factor: ReynoldsFactor = FR_NOT_APPLIED
     flow_rate_m3h: float = 0.0
     flow_source: str = 'supplied'
     relative_density_source: str = 'supplied'
@@ -89,7 +92,10 @@ class LiquidSizingResult:
         )
         fluid = f', {self.fluid}' if self.fluid else ''
         regime = ''
-        if self.flow_regime.checked and self.flow_regime.correction_needed:
+        if self.reynolds_factor.applied:
+            regime = (f" | {self.flow_regime.regime.upper()}, FR "
+                      f"{self.reynolds_factor.fr:.3g} applied")
+        elif self.flow_regime.checked and self.flow_regime.correction_needed:
             regime = f" | {self.flow_regime.regime.upper()}, turbulent equations do not apply"
         extra = ''
         if self.cavitation.flashing:
@@ -412,6 +418,26 @@ def liquid_flow_coefficient(
         valve_diameter_mm=valve_diameter_mm,
     )
 
+    # Non-turbulent correction. When the screening flags transitional or
+    # laminar flow and a valve diameter and rated coefficient are available,
+    # apply the Annex A Reynolds factor and raise the required Kv to
+    # C_turbulent / FR. Reported separately, so a corrected answer arrives
+    # labelled rather than silently replacing the turbulent one.
+    reynolds_factor = FR_NOT_APPLIED
+    if (flow_regime.checked and flow_regime.correction_needed
+            and valve_diameter_mm and rated_kv and fl_value is not None):
+        reynolds_factor = apply_reynolds_factor(
+            turbulent_kv=kv,
+            flow_rate_m3h=q,
+            kinematic_viscosity_cst=kinematic_viscosity,
+            fl=fl_value,
+            fd=fd,
+            valve_diameter_mm=valve_diameter_mm,
+            rated_kv=rated_kv,
+        )
+        if reynolds_factor.applied:
+            kv = reynolds_factor.corrected_kv
+
     velocity = check_velocity(
         flow_rate_m3h=q,
         pipe_diameter_mm=pipe_diameter_mm,
@@ -449,6 +475,7 @@ def liquid_flow_coefficient(
         ff=ff,
         fluid=fluid_obj.name if fluid_obj else None,
         flow_regime=flow_regime,
+        reynolds_factor=reynolds_factor,
         flow_rate_m3h=q,
         flow_source=flow_source,
         relative_density_source=relative_density_source,

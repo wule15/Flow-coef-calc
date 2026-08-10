@@ -9,8 +9,9 @@ service, and false for viscous liquids, small valves and low flows.
 **This module screens the assumption. It does not correct for it.**
 
 When flow is not fully turbulent, IEC applies a Reynolds number factor FR
-that reduces the effective coefficient. FR is not implemented here. What is
-implemented is the check that tells you the turbulent equations no longer
+that reduces the effective coefficient. FR is not computed in this module; it
+lives in reynolds_factor.py and the liquid sizing path applies it. What is
+implemented here is the check that tells you the turbulent equations no longer
 apply, so a viscous answer arrives labelled rather than silently wrong.
 
 That distinction is the whole point of the module. A library that quietly
@@ -139,9 +140,10 @@ def screen(
         correction = True
         note = (
             'Laminar. The turbulent sizing equations do not describe this flow '
-            'and the coefficient above is not trustworthy. EN IEC '
-            '60534-2-1:2011 Annex A gives the Reynolds factor FR, which this '
-            'library does not yet implement.'
+            'and the bare coefficient above is not trustworthy. EN IEC '
+            '60534-2-1:2011 Annex A gives the Reynolds factor FR; the liquid '
+            'sizing path applies it and reports the corrected coefficient. The '
+            'gas path does not yet.'
         )
     else:
         regime = 'transitional'
@@ -149,8 +151,8 @@ def screen(
         note = (
             'Transitional. The turbulent sizing equations are losing accuracy '
             'and the error grows as Rev falls. EN IEC 60534-2-1:2011 Annex A '
-            'gives the Reynolds factor FR, which this library does not yet '
-            'implement.'
+            'gives the Reynolds factor FR; the liquid sizing path applies it '
+            'and reports the corrected coefficient. The gas path does not yet.'
         )
 
     if not used_diameter:
