@@ -45,7 +45,9 @@ from .checks import OpeningCheck, VelocityCheck, check_opening, check_velocity
 from .gas import GasSizingResult, gas_flow_coefficient
 from .materials import MATERIALS, Material, MaterialGuidance, screen_materials
 from .regime import FlowRegime, screen as screen_flow_regime
-from .reynolds_factor import ReynoldsFactor, apply_reynolds_factor
+from .reynolds_factor import (ReynoldsFactor, apply_gas_reynolds_factor,
+                              apply_reynolds_factor,
+                              nonturbulent_gas_expansion_factor)
 from .thermal import (JouleThomsonEstimate, estimate_joule_thomson,
                       flow_from_thermal_duty)
 from .liquid import LiquidSizingResult, liquid_flow_coefficient, liquid_flow_rate
@@ -90,7 +92,8 @@ __all__ = [
     'check_velocity', 'check_opening', 'VelocityCheck', 'OpeningCheck',
     'evaluate_cavitation', 'CavitationIndex',
     'screen_flow_regime', 'FlowRegime',
-    'apply_reynolds_factor', 'ReynoldsFactor',
+    'apply_reynolds_factor', 'apply_gas_reynolds_factor',
+    'nonturbulent_gas_expansion_factor', 'ReynoldsFactor',
     'get_valve_style',
     'ValveStyle',
     'VALVE_STYLES',

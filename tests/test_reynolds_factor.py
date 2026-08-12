@@ -148,3 +148,57 @@ class TestEndToEndThroughLiquidSizing:
             valve_diameter_mm=50.0, rated_kv=40.0)
         assert r.reynolds_factor.applied is False
         assert r.flow_regime.regime == 'turbulent'
+
+
+class TestGasNonTurbulent:
+    """
+    Non-turbulent compressible flow, EN IEC 60534-2-1:2011 Annex A Eq. A.4 (the
+    volumetric non-turbulent equation) and Eq. A.5 (the expansion factor Y). The
+    standard has no worked example for this path, so these pin the Eq. A.5
+    boundary identities, the N22-vs-N7 unit consistency, and the wiring.
+    """
+
+    def test_A5_Y_is_continuous_at_the_1000_boundary(self):
+        from flowcoefficient.reynolds_factor import nonturbulent_gas_expansion_factor as Y
+        # upper branch collapses to the laminar value (1-x)/2 at Rev = 1000
+        assert Y(1000.0, 0.2, 0.5) == pytest.approx((1 - 0.2) / 2)
+
+    def test_A5_Y_reaches_the_turbulent_value_at_10000(self):
+        from flowcoefficient.reynolds_factor import nonturbulent_gas_expansion_factor as Y
+        x, xc = 0.2, 0.5
+        assert Y(10000.0, x, xc) == pytest.approx(1 - x / (3 * xc))
+
+    def test_A5_Y_is_the_laminar_value_below_1000(self):
+        from flowcoefficient.reynolds_factor import nonturbulent_gas_expansion_factor as Y
+        assert Y(500.0, 0.3, 0.6) == pytest.approx((1 - 0.3) / 2)
+
+    def test_N22_is_unit_consistent_with_the_verified_turbulent_N7(self):
+        # The non-turbulent Eq A.4 (molar mass M, N22) must reduce to the
+        # turbulent Eq (relative density Gg, N7) in the low pressure-drop limit,
+        # which requires N22*sqrt(2/M_air) == N7. Verified turbulent N7 = 455.336.
+        from flowcoefficient.reynolds_factor import N22
+        from flowcoefficient.fluids import MOLAR_MASS_AIR
+        assert N22 * math.sqrt(2.0 / MOLAR_MASS_AIR) == pytest.approx(455.336, rel=3e-3)
+
+    def test_apply_gas_raises_the_coefficient(self):
+        from flowcoefficient.reynolds_factor import apply_gas_reynolds_factor
+        r = apply_gas_reynolds_factor(
+            turbulent_kv=2.0, flow_rate_m3h=50.0, kinematic_viscosity_cst=300.0,
+            fl=0.9, fd=0.46, valve_diameter_mm=25.0, rated_kv=8.0,
+            inlet_pressure_bar=6.0, outlet_pressure_bar=4.0, effective_x=0.333,
+            choked_x=0.6, molar_mass_g_mol=28.96, temperature_k=293.0)
+        assert r.applied is True
+        assert r.fr < 1.0
+        assert r.corrected_kv > 0
+
+    def test_end_to_end_viscous_gas_screens_and_corrects(self):
+        from flowcoefficient import gas_flow_coefficient
+        r = gas_flow_coefficient(
+            flow_rate=30.0, inlet_pressure=6.0, outlet_pressure=4.0,
+            pressure_basis='absolute', temperature=20, fluid='air',
+            xt=0.7, fl=0.9, kinematic_viscosity=400.0, valve_style='globe',
+            valve_diameter_mm=20.0, rated_kv=10.0)
+        assert r.flow_regime.checked is True
+        if r.flow_regime.correction_needed:
+            assert r.reynolds_factor.applied is True
+            assert 'FR' in str(r)

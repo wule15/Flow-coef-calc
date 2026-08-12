@@ -4,9 +4,12 @@ Status: IMPLEMENTED on the liquid path (flowcoefficient/reynolds_factor.py),
 2026-08-10, after physics sign-off. The FR equation is pinned to the standard's
 FR = 0.715 worked example, and the Kv constants N18 = 0.865 and N32 = 140 are
 cross-checked against the Cv-basis figures by the unit conversion (linear for
-N18, the 2/3 power for N32). The GAS path is still NOT implemented: it needs the
-non-turbulent expansion factor Y of Eq. A.5 (section 4a below), which is the
-remaining gap. The physics record below is retained as the derivation.
+N18, the 2/3 power for N32). The GAS path is now ALSO implemented (2026-08-11): the
+Eq. A.4 volumetric non-turbulent equation with N22 = 1.73e3 (verified against the
+primary IEC:2011 and ISA:2002 Table 1, and cross-checked as unit-consistent with
+the verified turbulent N7), and the Eq. A.5 expansion factor with the laminar
+term (1 - x)/2 read directly off the rendered standard. The physics record below
+is retained as the derivation.
 
 Source: EN IEC 60534-2-1:2011 (Edition 2), Annex A (normative), "Sizing
 equations for non-turbulent flow", Equations A.1 to A.8. This is the current
@@ -96,9 +99,14 @@ The 2011 edition adds an expansion factor for non-turbulent compressible flow
 (Annex A, Eq. A.5) that the 1998 edition did not have. It blends toward the
 turbulent Y as Rev rises:
 
-    Rev >= 1000:  Y = (Rev - 1000)/9000 * ( 1 - x_sizing/(3*x_choked) - sqrt(1 - x/2) )
-                      + sqrt(1 - x/2)
-    Rev <  1000:  Y = sqrt(1 - x/2)
+    Rev >= 1000:  Y = (Rev - 1000)/9000 * ( (1 - x_sizing/(3*x_choked)) - (1 - x)/2 )
+                      + (1 - x)/2
+    Rev <  1000:  Y = (1 - x)/2
+
+    CORRECTED 2026-08-11: the laminar term is (1 - x)/2, read directly off the
+    rendered Eq. A.5 (p.20 of EN IEC 60534-2-1:2011). This proposal originally
+    transcribed it as sqrt(1 - x/2), which was wrong and would have oversized the
+    valve differently by up to a factor of two. Now implemented as (1 - x)/2.
 
 The gas non-turbulent model is W = C*N27*FR*Y*sqrt(dp*(p1+p2)*M/T1) (Eq. A.3),
 or the Qs form with N22 (Eq. A.4). Implement the liquid FR path first, then the

@@ -73,6 +73,23 @@ VALIDITY_CAP = 0.047
 # (Eq. A.7). Matches regime.FULLY_LAMINAR_BELOW.
 LAMINAR_BELOW = 10.0
 
+# Non-turbulent COMPRESSIBLE flow. EN IEC 60534-2-1:2011 Annex A Eq. A.4 (the
+# volumetric form this library sizes on) uses N22 with the molar-mass M and an
+# average-pressure (p1+p2) density correction, not the turbulent N9/N7 form.
+# Table 1, Kv basis, Q in m3/h at the 0 C normal reference, p in bar, T in K,
+# M in g/mol. N22 = 1.73e3; verified against the primary IEC:2011 and ISA:2002
+# tables, and cross-checked here against the already-verified turbulent N7: in
+# the low pressure-drop limit N22*sqrt(2/M_air) = 454.6 lands on N7 = 455.3
+# (0.15 percent), so the two forms are unit-consistent. N27 is the mass-flow
+# (kg/h) sibling, kept for reference; the library sizes on the volumetric form.
+N22 = 1.73e3
+N27 = 7.75e1
+
+# Rev below this is fully laminar for the gas expansion factor (Eq. A.5); at or
+# above 10000 the flow is turbulent and the non-turbulent path does not apply.
+GAS_NONTURBULENT_LAMINAR_BELOW = 1000.0
+GAS_TURBULENT_ABOVE = 10_000.0
+
 
 @dataclass(frozen=True)
 class ReynoldsFactor:
@@ -249,6 +266,146 @@ def apply_reynolds_factor(
             f' NOTE: C/(N18 d^2) exceeds the Eq. A.4(3) validity limit of '
             f'{VALIDITY_CAP}, so the corrected coefficient is outside the '
             f'range the Annex A fit was validated over.'
+        )
+
+    return ReynoldsFactor(
+        applied=True, fr=fr, turbulent_kv=turbulent_kv, corrected_kv=corrected_kv,
+        reynolds=reynolds, n=n, trim=trim, within_validity=within_validity,
+        passes=passes, converged=converged, note=note,
+    )
+
+
+def nonturbulent_gas_expansion_factor(reynolds: float, x: float, x_choked: float) -> float:
+    """
+    Non-turbulent compressible expansion factor Y. EN IEC 60534-2-1:2011 Eq. A.5
+    (new in the 2011 edition; the 1998 edition had no Y in the non-turbulent gas
+    equations). It interpolates linearly across the transitional band between the
+    laminar value (1 - x)/2 and the turbulent value 1 - x/(3 x_choked):
+
+        Rev < 1000:            Y = (1 - x) / 2
+        1000 <= Rev < 10000:   Y = (Rev-1000)/9000 * [ (1 - x/(3 x_choked)) - (1-x)/2 ] + (1-x)/2
+
+    At Rev = 1000 the upper branch collapses to (1 - x)/2 (continuous), and at
+    Rev = 10000 it reaches the turbulent Y, matching the main-body expansion
+    factor. The laminar limit is (1 - x)/2, read directly off the rendered Eq.
+    A.5 on p.20 of the standard (the fraction bar under 1 - x is unambiguous, and
+    an earlier transcription of it as sqrt(1 - x/2) was wrong). There is no worked
+    example for it in the standard, so it is verified by that direct read, the
+    boundary identities, and N22 being unit-consistent with the verified N7.
+
+    >>> round(nonturbulent_gas_expansion_factor(1000.0, 0.2, 0.5), 4)  # laminar edge
+    0.4
+    >>> round(nonturbulent_gas_expansion_factor(500.0, 0.2, 0.5), 4)   # laminar
+    0.4
+    """
+    laminar = (1.0 - x) / 2.0
+    turbulent = 1.0 - x / (3.0 * x_choked)
+    if reynolds < GAS_NONTURBULENT_LAMINAR_BELOW:
+        return laminar
+    frac = (reynolds - 1000.0) / 9000.0
+    return frac * (turbulent - laminar) + laminar
+
+
+def apply_gas_reynolds_factor(
+    turbulent_kv: float,
+    flow_rate_m3h: float,
+    kinematic_viscosity_cst: float,
+    fl: float,
+    fd: float,
+    valve_diameter_mm: float,
+    rated_kv: float,
+    inlet_pressure_bar: float,
+    outlet_pressure_bar: float,
+    effective_x: float,
+    choked_x: float,
+    molar_mass_g_mol: float,
+    temperature_k: float,
+) -> ReynoldsFactor:
+    """
+    Size a NON-TURBULENT gas coefficient. EN IEC 60534-2-1:2011 Annex A Eq. A.4
+    (volumetric form), solved for C with the Reynolds factor FR and the Eq. A.5
+    expansion factor Y:
+
+        C = Q / ( N22 * FR * Y * sqrt( dp * (p1+p2) * / (M * T1) ) )
+
+    where dp = p1 - p2 (bar), M is the molar mass (g/mol), Q is the volumetric
+    flow at the 0 C normal reference. FR depends on the coefficient through Rev,
+    so it iterates to a fixed point, as on the liquid side. Unlike the turbulent
+    gas equation this uses the average-pressure (p1+p2) density correction for
+    non-isentropic expansion, and N22 rather than N7; the two forms are
+    unit-consistent (checked against the verified N7 in the low pressure-drop
+    limit).
+
+    Returns NOT_APPLIED when an input is missing or the flow proves turbulent.
+    """
+    if turbulent_kv <= 0 or valve_diameter_mm <= 0 or rated_kv <= 0:
+        return NOT_APPLIED
+    if kinematic_viscosity_cst <= 0 or fl <= 0 or fd <= 0:
+        return NOT_APPLIED
+    if molar_mass_g_mol <= 0 or temperature_k <= 0 or choked_x <= 0:
+        return NOT_APPLIED
+
+    dp = inlet_pressure_bar - outlet_pressure_bar
+    p_sum = inlet_pressure_bar + outlet_pressure_bar
+    if dp <= 0:
+        return NOT_APPLIED
+    density_term = math.sqrt(dp * p_sum / (molar_mass_g_mol * temperature_k))
+
+    full_size = trim_is_full_size(rated_kv, valve_diameter_mm)
+    trim = 'full-size' if full_size else 'reduced'
+
+    kv = turbulent_kv
+    fr = 1.0
+    reynolds = math.nan
+    n = math.nan
+    y = math.nan
+    converged = False
+    passes = 0
+    for passes in range(1, MAX_PASSES + 1):
+        reynolds = _reynolds_number(
+            kv, flow_rate_m3h, kinematic_viscosity_cst, fl, fd, valve_diameter_mm)
+        n = n_factor(kv, valve_diameter_mm, full_size)
+        fr = reynolds_factor(reynolds, n, fl)
+        y = nonturbulent_gas_expansion_factor(reynolds, effective_x, choked_x)
+        kv_next = flow_rate_m3h / (N22 * fr * y * density_term)
+        if abs(kv_next - kv) <= CONVERGENCE_TOLERANCE * max(kv_next, 1e-12):
+            kv = kv_next
+            converged = True
+            break
+        kv = kv_next
+    else:
+        reynolds = _reynolds_number(
+            kv, flow_rate_m3h, kinematic_viscosity_cst, fl, fd, valve_diameter_mm)
+        n = n_factor(kv, valve_diameter_mm, full_size)
+        fr = reynolds_factor(reynolds, n, fl)
+
+    if fr >= 1.0:
+        return ReynoldsFactor(
+            applied=False, fr=1.0, turbulent_kv=turbulent_kv,
+            corrected_kv=turbulent_kv, reynolds=reynolds, n=n, trim=trim,
+            within_validity=True, passes=passes, converged=converged,
+            note=('Reynolds factor resolved to 1 at the settled coefficient, so '
+                  'the turbulent gas coefficient stands.'),
+        )
+
+    corrected_kv = kv
+    within_validity = corrected_kv / (N18 * valve_diameter_mm ** 2) <= VALIDITY_CAP
+    settled = ('converged' if converged
+               else f'DID NOT CONVERGE in {MAX_PASSES} passes, treat with caution')
+    note = (
+        f'Non-turbulent gas flow. EN IEC 60534-2-1:2011 Annex A Eq. A.4 with '
+        f'FR = {fr:.4g} and non-turbulent Y = {y:.4g} on {trim} trim, Rev '
+        f'{reynolds:,.0f}, n {n:.4g}. Sized Kv {corrected_kv:.4g} against the '
+        f'turbulent estimate {turbulent_kv:.4g}. {settled} in {passes} passes. '
+        f'Unlike the liquid FR this gas path has no worked example in the '
+        f'standard, so it is verified by the Eq. A.5 boundary identities and by '
+        f'N22 being unit-consistent with the verified turbulent N7, not by an '
+        f'external number. The Annex A curves also lose accuracy at low travel.'
+    )
+    if not within_validity:
+        note += (
+            f' NOTE: C/(N18 d^2) exceeds the Eq. A.4(3) validity limit of '
+            f'{VALIDITY_CAP}.'
         )
 
     return ReynoldsFactor(

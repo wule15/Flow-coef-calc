@@ -98,7 +98,10 @@ from .materials import NOT_SCREENED, MaterialGuidance, screen_materials
 from .thermal import JouleThomsonEstimate, NOT_ESTIMATED, estimate_joule_thomson
 from .travel import (CONVERGENCE_TOLERANCE, MAX_PASSES, NOT_LOCATED,
                      OperatingPoint, locate)
-from .valves import resolve_xt
+from .regime import FlowRegime, NOT_CHECKED, screen
+from .reynolds_factor import (NOT_APPLIED as FR_NOT_APPLIED, ReynoldsFactor,
+                              apply_gas_reynolds_factor)
+from .valves import get_valve_style, resolve_fl, resolve_xt
 
 # ── N9, derived rather than quoted. See the module docstring. ───────────────
 # Established imperial form: Q[scfh] = 1360 * Cv * p1[psia] * Y * sqrt(...)
@@ -168,6 +171,8 @@ class GasSizingResult:
     materials: MaterialGuidance = NOT_SCREENED
     piping: PipingGeometry = FP_NOT_APPLIED
     kv_bare_valve: float = 0.0
+    flow_regime: FlowRegime = NOT_CHECKED
+    reynolds_factor: ReynoldsFactor = FR_NOT_APPLIED
     velocity: VelocityCheck = VELOCITY_NOT_CHECKED
     opening: OpeningCheck = OpeningCheck(False, 0.0, None, None, ())
 
@@ -184,13 +189,19 @@ class GasSizingResult:
         for check in (self.velocity, self.opening):
             if check.warnings:
                 jt += f" | {check.warnings[0]}"
+        regime = ''
+        if self.reynolds_factor.applied:
+            regime = (f" | {self.flow_regime.regime.upper()}, FR "
+                      f"{self.reynolds_factor.fr:.3g} applied")
+        elif self.flow_regime.checked and self.flow_regime.correction_needed:
+            regime = f" | {self.flow_regime.regime.upper()}, turbulent equations do not apply"
         return (
             f"Kv {self.kv:.4g} (Cv {self.cv:.4g}) | "
             f"inputs {self.pressure_basis}{fluid} | "
             f"x {self.pressure_drop_ratio:.3f}, "
             f"Y {self.expansion_factor:.3f}"
             f"{' assumed' if 'assumed' in self.expansion_factor_source else ''}"
-            f" | {state}{jt}"
+            f" | {state}{regime}{jt}"
         )
 
 
@@ -204,6 +215,8 @@ def gas_flow_coefficient(
     fluid: str | None = None,
     gamma: float | None = None,
     xt: float | None = None,
+    fl: float | None = None,
+    kinematic_viscosity: float | None = None,
     valve_style: str | None = None,
     compressibility: float = 1.0,
     valve_diameter_mm: float | None = None,
@@ -239,7 +252,8 @@ def gas_flow_coefficient(
     require_finite(
         flow_rate=flow_rate, inlet_pressure=inlet_pressure,
         outlet_pressure=outlet_pressure, temperature=temperature,
-        relative_density=relative_density, gamma=gamma, xt=xt,
+        relative_density=relative_density, gamma=gamma, xt=xt, fl=fl,
+        kinematic_viscosity=kinematic_viscosity,
         compressibility=compressibility, valve_diameter_mm=valve_diameter_mm,
         pipe_diameter_mm=pipe_diameter_mm,
         downstream_diameter_mm=downstream_diameter_mm, rated_kv=rated_kv,
@@ -421,6 +435,40 @@ def gas_flow_coefficient(
 
     kv = kv_bare / piping.fp
 
+    # Non-turbulent screening and correction. The turbulent gas equation assumes
+    # Rev >= 10000; a viscous gas or a very small valve can fall below that. When
+    # FL, a kinematic viscosity and an xT are available and the screen flags the
+    # duty, the coefficient is re-sized with the Annex A non-turbulent gas
+    # equation (Eq. A.4), which uses the average-pressure density correction and
+    # the Eq. A.5 expansion factor, rather than the turbulent equation.
+    fl_value, _fl_source = resolve_fl(fl, valve_style)
+    fd = get_valve_style(valve_style).fd if valve_style else 0.46
+    flow_regime = screen(
+        flow_rate_m3h=q, kv=kv, kinematic_viscosity_cst=kinematic_viscosity,
+        fl=fl_value, fd=fd, valve_diameter_mm=valve_diameter_mm,
+    )
+    reynolds_factor = FR_NOT_APPLIED
+    if (flow_regime.checked and flow_regime.correction_needed
+            and valve_diameter_mm and rated_kv and fl_value is not None
+            and limiting_ratio):
+        reynolds_factor = apply_gas_reynolds_factor(
+            turbulent_kv=kv,
+            flow_rate_m3h=q,
+            kinematic_viscosity_cst=kinematic_viscosity,
+            fl=fl_value,
+            fd=fd,
+            valve_diameter_mm=valve_diameter_mm,
+            rated_kv=rated_kv,
+            inlet_pressure_bar=p1,
+            outlet_pressure_bar=p2,
+            effective_x=x_effective,
+            choked_x=limiting_ratio,
+            molar_mass_g_mol=relative_density * MOLAR_MASS_AIR,
+            temperature_k=temperature_k,
+        )
+        if reynolds_factor.applied:
+            kv = reynolds_factor.corrected_kv
+
     # Velocity, evaluated at the OUTLET. Gas expands through the valve, so
     # the outlet is where density is lowest and velocity highest, and that is
     # where erosion and noise are decided. Density from the ideal gas law
@@ -486,6 +534,8 @@ def gas_flow_coefficient(
         materials=materials,
         piping=piping,
         kv_bare_valve=kv_bare,
+        flow_regime=flow_regime,
+        reynolds_factor=reynolds_factor,
         velocity=outlet_velocity,
         opening=check_opening(kv, rated_kv),
     )
