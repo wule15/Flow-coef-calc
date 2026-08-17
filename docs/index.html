@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control Valve Sizing, EN IEC 60534-2-1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #eef1f2; --surface: #ffffff; --field: #f5f8f8;
+    --ink: #15242b; --muted: #5c6f77; --faint: #8a9aa1;
+    --line: #d6dde0; --line-strong: #c2cbcf;
+    --accent: #0c8c81; --accent-deep: #0a6f66; --accent-ink: #ffffff;
+    --accent-wash: #e4f2f0; --warn: #a86414; --warn-wash: #f6ecda; --danger: #b23b3b;
+    --radius: 7px;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1618; --surface: #14201f; --field: #0f1a1b;
+      --ink: #e7eef0; --muted: #92a4a9; --faint: #6d8087;
+      --line: #263536; --line-strong: #324443;
+      --accent: #2bb6a5; --accent-deep: #29a99a; --accent-ink: #06201d;
+      --accent-wash: #12312d; --warn: #d7a44a; --warn-wash: #2c2517; --danger: #e07a7a;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f2; --surface: #ffffff; --field: #f5f8f8;
+    --ink: #15242b; --muted: #5c6f77; --faint: #8a9aa1;
+    --line: #d6dde0; --line-strong: #c2cbcf;
+    --accent: #0c8c81; --accent-deep: #0a6f66; --accent-ink: #ffffff;
+    --accent-wash: #e4f2f0; --warn: #a86414; --warn-wash: #f6ecda; --danger: #b23b3b;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1618; --surface: #14201f; --field: #0f1a1b;
+    --ink: #e7eef0; --muted: #92a4a9; --faint: #6d8087;
+    --line: #263536; --line-strong: #324443;
+    --accent: #2bb6a5; --accent-deep: #29a99a; --accent-ink: #06201d;
+    --accent-wash: #12312d; --warn: #d7a44a; --warn-wash: #2c2517; --danger: #e07a7a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: clamp(20px, 4vw, 52px) clamp(16px, 4vw, 32px) 40px; }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 22px; margin-bottom: 22px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-deep); margin: 0 0 10px; }
+  h1 { font-size: clamp(24px, 3.4vw, 33px); line-height: 1.12; margin: 0 0 8px; letter-spacing: -0.02em; text-wrap: balance; font-weight: 620; }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; font-size: 15.5px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 22px; }
+  .tabs button {
+    font-family: var(--sans); font-size: 14px; font-weight: 550; cursor: pointer;
+    padding: 9px 16px 11px; border: none; border-bottom: 2px solid transparent;
+    background: none; color: var(--muted); letter-spacing: 0.01em;
+  }
+  .tabs button[aria-selected="true"] { color: var(--accent-deep); border-bottom-color: var(--accent); }
+  .tabs button:hover { color: var(--ink); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .panel h2 { font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; font-weight: 640; font-family: var(--mono); }
+
+  .field { margin-bottom: 14px; }
+  .field.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label { display: block; font-size: 13px; color: var(--ink); margin-bottom: 6px; font-weight: 520; }
+  label .sym { color: var(--faint); font-family: var(--mono); font-weight: 400; }
+  .inputrow { display: flex; align-items: stretch; }
+  input[type="number"] {
+    flex: 1; min-width: 0; width: 100%; font-family: var(--mono); font-size: 15px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line-strong);
+    border-radius: var(--radius) 0 0 var(--radius); padding: 9px 11px; -moz-appearance: textfield;
+  }
+  input.solo { border-radius: var(--radius); }
+  .unit {
+    display: flex; align-items: center; padding: 0 10px; font-family: var(--mono); font-size: 12.5px;
+    color: var(--muted); background: var(--field); border: 1px solid var(--line-strong);
+    border-left: none; border-radius: 0 var(--radius) var(--radius) 0; white-space: nowrap;
+  }
+  input:focus, .seg button:focus-visible, .btn:focus-visible, summary:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input:focus { border-color: var(--accent); }
+
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
+  .seg button { font-family: var(--mono); font-size: 12.5px; padding: 6px 13px; border: none; background: var(--field); color: var(--muted); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+
+  details { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 13px; }
+  summary { cursor: pointer; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); list-style: none; user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+ "; color: var(--accent); font-weight: 700; }
+  details[open] summary::before { content: "\2212 "; }
+  .adv-note { font-size: 12.5px; color: var(--faint); margin: 10px 0 14px; }
+
+  .btnrow { margin-top: 16px; }
+  .btn { font-family: var(--sans); font-size: 13px; font-weight: 550; cursor: pointer; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--field); color: var(--ink); }
+  .btn.ghost:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+  .result { position: sticky; top: 20px; }
+  .readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .readout { background: var(--surface); padding: 16px 18px; }
+  .readout .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .readout .v { font-family: var(--mono); font-size: clamp(28px, 6vw, 38px); font-weight: 600; letter-spacing: -0.02em; line-height: 1; color: var(--accent-deep); }
+
+  .chip { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.03em; padding: 5px 11px; border-radius: 100px; border: 1px solid var(--line-strong); background: var(--field); color: var(--muted); }
+  .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .chip.ok { color: var(--accent-deep); background: var(--accent-wash); border-color: transparent; }
+  .chip.ok::before { background: var(--accent); }
+  .chip.warn { color: var(--warn); background: var(--warn-wash); border-color: transparent; }
+  .chip.warn::before { background: var(--warn); }
+
+  .breakdown { margin-top: 18px; width: 100%; border-collapse: collapse; font-size: 13px; }
+  .breakdown th { text-align: left; font-weight: 500; color: var(--muted); padding: 6px 0; font-size: 12.5px; }
+  .breakdown td { text-align: right; font-family: var(--mono); padding: 6px 0; color: var(--ink); border-bottom: 1px solid var(--line); }
+  .breakdown tr:last-child td { border-bottom: none; }
+  .breakdown td .dim { color: var(--faint); }
+
+  .formula { font-family: var(--mono); font-size: 12.5px; color: var(--muted); background: var(--field); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-top: 16px; overflow-x: auto; }
+  .formula b { color: var(--accent-deep); font-weight: 600; }
+  .err { color: var(--danger); font-size: 13.5px; margin-top: 4px; min-height: 1px; }
+
+  footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  footer p { margin: 0 0 8px; max-width: 74ch; }
+  footer a { color: var(--accent-deep); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  footer a:hover { border-bottom-color: var(--accent); }
+  .cite { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">EN IEC 60534-2-1:2011</p>
+    <h1>Control valve flow coefficient</h1>
+    <p class="lede">Required K<sub>v</sub> and C<sub>v</sub> to pass a given flow across a given pressure drop, with the choked-flow limit. A live demo of the open-source sizing library.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Fluid state">
+    <button role="tab" id="tab-liq" aria-selected="true" aria-controls="panel-liq">Liquid</button>
+    <button role="tab" id="tab-gas" aria-selected="false" aria-controls="panel-gas">Gas &amp; vapour</button>
+  </div>
+
+  <!-- ===================== LIQUID ===================== -->
+  <div id="panel-liq" role="tabpanel" aria-labelledby="tab-liq">
+    <div class="grid">
+      <section class="panel">
+        <h2>Service conditions &middot; clause 6</h2>
+
+        <div class="field">
+          <label for="l-q">Flow rate <span class="sym">Q</span></label>
+          <div class="inputrow"><input type="number" id="l-q" value="25" min="0" step="any" inputmode="decimal"><span class="unit">m&sup3;/h</span></div>
+        </div>
+        <div class="field pair">
+          <div><label for="l-p1">Inlet <span class="sym">p&#8321;</span></label><div class="inputrow"><input type="number" id="l-p1" value="6" step="any" inputmode="decimal"><span class="unit">bar</span></div></div>
+          <div><label for="l-p2">Outlet <span class="sym">p&#8322;</span></label><div class="inputrow"><input type="number" id="l-p2" value="4" step="any" inputmode="decimal"><span class="unit">bar</span></div></div>
+        </div>
+        <div class="field">
+          <label>Pressure basis</label>
+          <div class="seg" id="l-basis" role="group" aria-label="Pressure basis">
+            <button type="button" data-basis="absolute" aria-pressed="true">Absolute</button>
+            <button type="button" data-basis="gauge" aria-pressed="false">Gauge</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="l-sg">Relative density <span class="sym">&rho;&#8321;/&rho;&#8320;</span></label>
+          <div class="inputrow"><input type="number" id="l-sg" class="solo" value="1.0" min="0" step="any" inputmode="decimal"></div>
+          <div class="err" id="l-err" role="alert"></div>
+        </div>
+
+        <details id="l-choke">
+          <summary>Choked-flow check (optional)</summary>
+          <p class="adv-note">Clause 7. A liquid chokes when the vena-contracta pressure reaches the vapour pressure. Supply all three and sizing uses the choked pressure drop, so the valve is not oversized.</p>
+          <div class="field"><label for="l-fl">Pressure recovery <span class="sym">F<sub>L</sub></span></label><div class="inputrow"><input type="number" id="l-fl" class="solo" placeholder="e.g. 0.90" min="0" max="1" step="any" inputmode="decimal"></div></div>
+          <div class="field pair">
+            <div><label for="l-pv">Vapour <span class="sym">p<sub>v</sub></span></label><div class="inputrow"><input type="number" id="l-pv" placeholder="0.03" min="0" step="any" inputmode="decimal"><span class="unit">bar a</span></div></div>
+            <div><label for="l-pc">Critical <span class="sym">p<sub>c</sub></span></label><div class="inputrow"><input type="number" id="l-pc" placeholder="221" min="0" step="any" inputmode="decimal"><span class="unit">bar a</span></div></div>
+          </div>
+        </details>
+
+        <div class="btnrow"><button type="button" class="btn ghost" id="l-example">Load worked example</button></div>
+      </section>
+
+      <section class="panel result" aria-live="polite">
+        <h2>Required coefficient</h2>
+        <div class="readouts">
+          <div class="readout"><div class="k">K<sub>v</sub></div><div class="v"><span id="l-kv">17.68</span></div></div>
+          <div class="readout"><div class="k">C<sub>v</sub></div><div class="v"><span id="l-cv">20.44</span></div></div>
+        </div>
+        <div id="l-chip" class="chip">Choked check not performed</div>
+        <table class="breakdown"><tbody id="l-breakdown"></tbody></table>
+        <div class="formula">K<sub>v</sub> = Q / &radic;(&Delta;p / SG)&nbsp;&nbsp;&middot;&nbsp;&nbsp;<b id="l-flive"></b></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===================== GAS ===================== -->
+  <div id="panel-gas" role="tabpanel" aria-labelledby="tab-gas" hidden>
+    <div class="grid">
+      <section class="panel">
+        <h2>Service conditions &middot; clause 7</h2>
+
+        <div class="field">
+          <label for="g-q">Flow rate <span class="sym">Q, normal</span></label>
+          <div class="inputrow"><input type="number" id="g-q" value="500" min="0" step="any" inputmode="decimal"><span class="unit">Nm&sup3;/h</span></div>
+        </div>
+        <div class="field pair">
+          <div><label for="g-p1">Inlet <span class="sym">p&#8321;</span></label><div class="inputrow"><input type="number" id="g-p1" value="7" step="any" inputmode="decimal"><span class="unit">bar</span></div></div>
+          <div><label for="g-p2">Outlet <span class="sym">p&#8322;</span></label><div class="inputrow"><input type="number" id="g-p2" value="5" step="any" inputmode="decimal"><span class="unit">bar</span></div></div>
+        </div>
+        <div class="field">
+          <label>Pressure basis</label>
+          <div class="seg" id="g-basis" role="group" aria-label="Pressure basis">
+            <button type="button" data-basis="absolute" aria-pressed="true">Absolute</button>
+            <button type="button" data-basis="gauge" aria-pressed="false">Gauge</button>
+          </div>
+        </div>
+        <div class="field pair">
+          <div><label for="g-t">Inlet temp <span class="sym">T&#8321;</span></label><div class="inputrow"><input type="number" id="g-t" value="20" step="any" inputmode="decimal"><span class="unit">&deg;C</span></div></div>
+          <div><label for="g-gg">Rel. density <span class="sym">G<sub>g</sub></span></label><div class="inputrow"><input type="number" id="g-gg" class="solo" value="1.0" min="0" step="any" inputmode="decimal"></div></div>
+        </div>
+        <div class="field pair">
+          <div><label for="g-gamma">Sp. heat ratio <span class="sym">&gamma;</span></label><div class="inputrow"><input type="number" id="g-gamma" class="solo" value="1.40" min="1" max="2" step="any" inputmode="decimal"></div></div>
+          <div><label for="g-xt">Diff. ratio <span class="sym">x<sub>T</sub></span></label><div class="inputrow"><input type="number" id="g-xt" class="solo" value="0.72" min="0" max="1" step="any" inputmode="decimal"></div></div>
+        </div>
+        <div class="err" id="g-err" role="alert"></div>
+
+        <details id="g-adv">
+          <summary>Compressibility (optional)</summary>
+          <p class="adv-note">Z corrects for departure from the ideal gas law. Leave at 1.0 for moderate pressures; use the real value for high-pressure letdown.</p>
+          <div class="field"><label for="g-z">Compressibility <span class="sym">Z</span></label><div class="inputrow"><input type="number" id="g-z" class="solo" value="1.0" min="0" step="any" inputmode="decimal"></div></div>
+        </details>
+
+        <div class="btnrow"><button type="button" class="btn ghost" id="g-example">Load worked example</button></div>
+      </section>
+
+      <section class="panel result" aria-live="polite">
+        <h2>Required coefficient</h2>
+        <div class="readouts">
+          <div class="readout"><div class="k">K<sub>v</sub></div><div class="v"><span id="g-kv">—</span></div></div>
+          <div class="readout"><div class="k">C<sub>v</sub></div><div class="v"><span id="g-cv">—</span></div></div>
+        </div>
+        <div id="g-chip" class="chip">—</div>
+        <table class="breakdown"><tbody id="g-breakdown"></tbody></table>
+        <div class="formula">K<sub>v</sub> = Q / (N&#8327; &middot; p&#8321; &middot; Y &middot; &radic;(x / (G<sub>g</sub> T&#8321; Z)))&nbsp;&nbsp;&middot;&nbsp;&nbsp;<b id="g-flive"></b></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <p>Ports the verified formulas from the <a href="https://github.com/wule15/Flow-coef-calc" target="_blank" rel="noopener">Flow-coef-calc</a> library. Liquid: turbulent sizing (clause&nbsp;6.1) and the choked drop &Delta;p<sub>choked</sub>&nbsp;=&nbsp;F<sub>L</sub>&sup2;(p&#8321;&nbsp;&minus;&nbsp;F<sub>F</sub>&nbsp;p<sub>v</sub>) (clause&nbsp;7). Gas: the compressible equation with expansion factor Y&nbsp;=&nbsp;1&nbsp;&minus;&nbsp;x/(3&nbsp;F<sub>&gamma;</sub>&nbsp;x<sub>T</sub>), choking at x&nbsp;&ge;&nbsp;F<sub>&gamma;</sub>x<sub>T</sub> (clause&nbsp;7). The constant N&#8327;&nbsp;=&nbsp;455.3 is derived, not quoted. C<sub>v</sub>&nbsp;=&nbsp;K<sub>v</sub>/0.865.</p>
+    <p class="cite">Pinned to the standard's own worked examples across 331 tests. A demonstration, not a substitute for a stamped sizing calculation. Gas x<sub>T</sub> is a datasheet value; the library reads it off the valve's published curve and iterates.</p>
+  </footer>
+</div>
+
+<script>
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ATM = 1.01325;
+
+  // N7, derived exactly as the library does (see gas.py module docstring).
+  var NM3_TO_SCF = (288.706 / 273.15) * 35.31467;
+  var N7 = 1360.0 * 1.156 * 14.5037738 / Math.sqrt(1.8) / NM3_TO_SCF; // ~= 455.34
+
+  function num(el) { var v = parseFloat(el.value); return isFinite(v) ? v : NaN; }
+  function fmt(x, d) { return x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function sig(x) {
+    if (!isFinite(x)) return "—";
+    if (x >= 100) return fmt(x, 1);
+    if (x >= 10) return fmt(x, 2);
+    if (x >= 1) return fmt(x, 3);
+    return fmt(x, 4);
+  }
+  function wireBasis(groupId, onChange) {
+    var btns = document.querySelectorAll("#" + groupId + " button");
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        btns.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+        onChange(b.getAttribute("data-basis"));
+      });
+    });
+    return function reset(basis) { btns.forEach(function (o) { o.setAttribute("aria-pressed", o.getAttribute("data-basis") === basis ? "true" : "false"); }); };
+  }
+
+  /* ---------------- LIQUID ---------------- */
+  var lBasis = "absolute";
+  var lResetBasis = wireBasis("l-basis", function (b) { lBasis = b; calcLiquid(); });
+
+  function calcLiquid() {
+    var q = num($("l-q")), p1 = num($("l-p1")), p2 = num($("l-p2")), sg = num($("l-sg"));
+    var err = $("l-err");
+    function fail(m) { err.textContent = m; $("l-kv").textContent = "—"; $("l-cv").textContent = "—"; }
+    if (!(q > 0)) return fail("Enter a flow rate greater than zero.");
+    if (isNaN(p1) || isNaN(p2)) return fail("Enter both inlet and outlet pressures.");
+    if (!(p2 < p1)) return fail("Outlet pressure must be below inlet pressure.");
+    if (!(sg > 0)) return fail("Relative density must be greater than zero.");
+    err.textContent = "";
+
+    var dp = p1 - p2;
+    var p1abs = lBasis === "gauge" ? p1 + ATM : p1;
+    var dpEff = dp, choked = false, checked = false, ff = NaN, dpChoked = NaN;
+    var fl = num($("l-fl")), pv = num($("l-pv")), pc = num($("l-pc"));
+    if (isFinite(fl) && isFinite(pv) && isFinite(pc) && fl > 0 && pv >= 0 && pc > 0) {
+      checked = true;
+      ff = 0.96 - 0.28 * Math.sqrt(pv / pc);
+      dpChoked = fl * fl * (p1abs - ff * pv);
+      if (dpChoked > 0 && dp >= dpChoked) { choked = true; dpEff = dpChoked; }
+    }
+    var kv = q / Math.sqrt(dpEff / sg);
+    $("l-kv").textContent = sig(kv);
+    $("l-cv").textContent = sig(kv / 0.865);
+
+    var chip = $("l-chip"); chip.className = "chip";
+    if (!checked) chip.textContent = "Choked check not performed";
+    else if (choked) { chip.className = "chip warn"; chip.textContent = "Choked, sized on Δp_choked"; }
+    else { chip.className = "chip ok"; chip.textContent = "Not choked, full Δp available"; }
+
+    var h = "<tr><th>Pressure drop Δp</th><td>" + fmt(dp, 3) + " <span class='dim'>bar</span></td></tr>";
+    h += "<tr><th>Effective Δp (sizing)</th><td>" + fmt(dpEff, 3) + " <span class='dim'>bar</span></td></tr>";
+    if (checked) { h += "<tr><th>F<sub>F</sub></th><td>" + fmt(ff, 3) + "</td></tr>"; h += "<tr><th>Δp<sub>choked</sub></th><td>" + fmt(dpChoked, 3) + " <span class='dim'>bar</span></td></tr>"; }
+    $("l-breakdown").innerHTML = h;
+    $("l-flive").innerHTML = q + " / √(" + fmt(dpEff, 3) + " / " + sg + ")";
+  }
+  $("l-example").addEventListener("click", function () {
+    $("l-q").value = 25; $("l-p1").value = 6; $("l-p2").value = 4; $("l-sg").value = 1.0;
+    $("l-fl").value = ""; $("l-pv").value = ""; $("l-pc").value = "";
+    lBasis = "absolute"; lResetBasis("absolute"); $("l-choke").open = false; calcLiquid();
+  });
+  ["l-q", "l-p1", "l-p2", "l-sg", "l-fl", "l-pv", "l-pc"].forEach(function (id) { $(id).addEventListener("input", calcLiquid); });
+
+  /* ---------------- GAS ---------------- */
+  var gBasis = "absolute";
+  var gResetBasis = wireBasis("g-basis", function (b) { gBasis = b; calcGas(); });
+
+  function calcGas() {
+    var q = num($("g-q")), p1 = num($("g-p1")), p2 = num($("g-p2")), t = num($("g-t"));
+    var gg = num($("g-gg")), gamma = num($("g-gamma")), xt = num($("g-xt")), z = num($("g-z"));
+    var err = $("g-err");
+    function fail(m) { err.textContent = m; $("g-kv").textContent = "—"; $("g-cv").textContent = "—"; $("g-chip").className = "chip"; $("g-chip").textContent = "—"; $("g-breakdown").innerHTML = ""; }
+    if (!(q > 0)) return fail("Enter a flow rate greater than zero.");
+    if (isNaN(p1) || isNaN(p2)) return fail("Enter both inlet and outlet pressures.");
+    var p1abs = gBasis === "gauge" ? p1 + ATM : p1;
+    var p2abs = gBasis === "gauge" ? p2 + ATM : p2;
+    if (!(p1abs > 0)) return fail("Inlet pressure (absolute) must be positive.");
+    if (!(p2abs < p1abs)) return fail("Outlet pressure must be below inlet pressure.");
+    if (!(t > -273.15)) return fail("Temperature is at or below absolute zero.");
+    if (!(gg > 0)) return fail("Relative density must be greater than zero.");
+    if (!(gamma > 1 && gamma < 2)) return fail("Specific heat ratio γ lies between 1 and 2.");
+    if (!(xt > 0 && xt <= 1)) return fail("Enter xT from the valve datasheet (0 to 1).");
+    if (!(z > 0)) return fail("Compressibility Z must be greater than zero.");
+    err.textContent = "";
+
+    var tK = t + 273.15;
+    var x = (p1abs - p2abs) / p1abs;
+    var fg = gamma / 1.40;
+    var limiting = fg * xt;
+    var choked = x >= limiting;
+    var xEff = choked ? limiting : x;
+    var y = 1.0 - xEff / (3.0 * fg * xt);
+    var kv = q / (N7 * p1abs * y * Math.sqrt(xEff / (gg * tK * z)));
+
+    $("g-kv").textContent = sig(kv);
+    $("g-cv").textContent = sig(kv / 0.865);
+
+    var chip = $("g-chip"); chip.className = "chip warn";
+    if (choked) { chip.textContent = "Choked, Y limited to 0.667"; }
+    else { chip.className = "chip ok"; chip.textContent = "Not choked"; }
+
+    var h = "";
+    h += "<tr><th>Diff. pressure ratio x</th><td>" + fmt(x, 4) + "</td></tr>";
+    h += "<tr><th>Effective x (sizing)</th><td>" + fmt(xEff, 4) + "</td></tr>";
+    h += "<tr><th>Choked limit F<sub>γ</sub>x<sub>T</sub></th><td>" + fmt(limiting, 4) + "</td></tr>";
+    h += "<tr><th>Expansion factor Y</th><td>" + fmt(y, 4) + "</td></tr>";
+    $("g-breakdown").innerHTML = h;
+    $("g-flive").innerHTML = q + " / (" + fmt(N7, 1) + " · " + fmt(p1abs, 3) + " · " + fmt(y, 3) + " · √(" + fmt(xEff, 4) + " / (" + gg + "·" + fmt(tK, 1) + "·" + z + ")))";
+  }
+  $("g-example").addEventListener("click", function () {
+    $("g-q").value = 500; $("g-p1").value = 7; $("g-p2").value = 5; $("g-t").value = 20;
+    $("g-gg").value = 1.0; $("g-gamma").value = 1.40; $("g-xt").value = 0.72; $("g-z").value = 1.0;
+    gBasis = "absolute"; gResetBasis("absolute"); $("g-adv").open = false; calcGas();
+  });
+  ["g-q", "g-p1", "g-p2", "g-t", "g-gg", "g-gamma", "g-xt", "g-z"].forEach(function (id) { $(id).addEventListener("input", calcGas); });
+
+  /* ---------------- TABS ---------------- */
+  var tabLiq = $("tab-liq"), tabGas = $("tab-gas");
+  function selectTab(gas) {
+    tabGas.setAttribute("aria-selected", gas ? "true" : "false");
+    tabLiq.setAttribute("aria-selected", gas ? "false" : "true");
+    $("panel-gas").hidden = !gas;
+    $("panel-liq").hidden = gas;
+    if (gas) calcGas(); else calcLiquid();
+  }
+  tabLiq.addEventListener("click", function () { selectTab(false); });
+  tabGas.addEventListener("click", function () { selectTab(true); });
+
+  calcLiquid();
+  calcGas();
+</script>
+</body>
+</html>

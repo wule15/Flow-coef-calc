@@ -4,6 +4,8 @@ Valve sizing to EN IEC 60534-2-1. Works out the flow coefficient a duty needs, a
 
 Python 3.10 or newer. No dependencies, and there is a test that enforces that.
 
+**[Live demo](https://wule15.github.io/Flow-coef-calc/):** an interactive Kv and Cv calculator, liquid and gas, that ports these formulas to the browser. The Python library is what the numbers are checked against.
+
 ---
 
 ## Why it exists
