@@ -25,3 +25,6 @@ local/
 backup/
 old/
 archive/
+
+# Local knowledge-graph output. Built outside the repo, ignored in case it ever lands here.
+graphify-out/
