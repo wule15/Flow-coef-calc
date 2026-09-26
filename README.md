@@ -134,12 +134,12 @@ EN IEC 60534-2-3 defines the flow test a manufacturer runs to measure these. EN 
 
 ## What it does not do
 
-- **The Reynolds number factor FR is applied on the liquid path only, not the gas path.** A viscous liquid sizing is screened and then corrected: the result carries FR, the corrected Kv and its provenance (EN IEC 60534-2-1:2011 Annex A). A viscous gas sizing is still screened and reported but not corrected, because the compressible case also needs the non-turbulent expansion factor Y of Eq. A.5, which is not implemented. The FR correction also inherits the Annex A caveat that its curves are fitted at rated travel and lose accuracy at low opening.
+- **The Reynolds number factor FR is applied on both paths, and it inherits an Annex A caveat.** A viscous sizing, liquid or gas, is screened and then corrected: the result carries FR, the corrected Kv and its provenance (EN IEC 60534-2-1:2011 Annex A). The gas path solves the Eq. A.4 volumetric form with the Eq. A.5 expansion factor, using the average-pressure density correction and N22 rather than N7, and iterates to a fixed point because FR depends on the coefficient being solved for. The caveat that remains is Annex A's own: the FR curves are fitted at rated travel and lose accuracy at low opening.
 - No noise prediction, no two-phase or flashing flow, no valve travel or characteristic modelling.
 - Material screening is on temperature alone, and runs on the gas path only, since it exists to catch Joule-Thomson cooling. It excludes grades, it does not select one.
 - Liquid density is not corrected for temperature. The result says so when the flowing temperature is far from the tabulated one.
 - The Joule-Thomson figure is an order of magnitude estimate, not a design number.
-- No graphical or web interface yet. There is a library and a command line tool.
+- The browser calculator linked at the top is a port of these formulas to JavaScript, not the Python library running in a page. It covers the common liquid and gas cases and is checked against the library, but the library is the reference and the calculator is the demonstration. Anything the library refuses, the calculator may not.
 - The CLI does not expose every API parameter. `vapour_pressure`, `critical_pressure`, `specific_heat`, `downstream_diameter_mm`, `intermittent_service` and `atmospheric_pressure_bar` are library-only, so an error message suggesting you pass one of them is addressed to the API rather than the command line.
 
 ---
@@ -229,7 +229,7 @@ pytest
 
 ## Tests
 
-299 tests, no network, no files, nothing mocked.
+331 tests, no network, no files, nothing mocked.
 
 The ones that matter are in `tests/test_standard_examples.py`, because they compare against sources outside the library. Internal consistency is a weak claim: a library can be perfectly self-consistent and wrong by a constant factor, which is exactly what N9 was.
 
@@ -271,7 +271,7 @@ The three I would raise first if you were reviewing this.
 
 **Fluid property data is a small hand-entered table.** Seven fluids, each cited, each with a validity range that is enforced. But a wrong Antoine constant would be invisible until somebody's cavitation prediction was wrong, and only water and ammonia are checked against published vapour pressures.
 
-**FR is still not implemented.** Viscous service is screened and labelled but not corrected, so a transitional or laminar answer is a number the library has told you not to trust. That correction is implicit, the Reynolds number depends on the coefficient you are solving for, so it needs iteration. Doing it badly would produce a wrong answer that looks exactly as confident as a right one, which is why it is still outstanding rather than rushed.
+**FR is implemented on both paths now, and it is the newest code in here.** Viscous service is screened, corrected and labelled with its provenance. The correction is implicit, since the Reynolds number depends on the coefficient being solved for, so it iterates to a fixed point. Two things to hold against it. Annex A's curves are fitted at rated travel and lose accuracy at low opening, which is exactly where a viscous duty often sits. And the gas form is checked against the verified turbulent constant in the low pressure-drop limit rather than against a published worked example, because Annex A does not give one for the compressible case, so it has one fewer outside comparison than the liquid path.
 
 ---
 
